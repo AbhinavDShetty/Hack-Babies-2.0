@@ -1,242 +1,165 @@
-# Import necessary libraries
-import asyncio  # For handling asynchronous operations
-import os       # For environment variable access
-import sys      # For system-specific parameters and functions
-import json     # For handling JSON data (used when printing function declarations)
+# ==========================================================
+# MCP Client powered by Llama 3 (local Ollama)
+# ==========================================================
 
-# Import MCP client components
-from typing import Optional  # For type hinting optional values
-from contextlib import AsyncExitStack  # For managing multiple async tasks
-from mcp import ClientSession, StdioServerParameters  # MCP session management
-from mcp.client.stdio import stdio_client  # MCP client for standard I/O communication
+import asyncio
+import os
+import sys
+import json
+import urllib.request
+from typing import Optional
+from contextlib import AsyncExitStack
+import re
+import ast
 
-# Import Google's Gen AI SDK
-from google import genai
-from google.genai import types
-from google.genai.types import Tool, FunctionDeclaration
-from google.genai.types import GenerateContentConfig
+# MCP client imports
+from mcp import ClientSession, StdioServerParameters
+from mcp.client.stdio import stdio_client
 
-from dotenv import load_dotenv  # For loading API keys from a .env file
-
-# Load environment variables from .env file
-load_dotenv()
 
 class MCPClient:
     def __init__(self):
-        """Initialize the MCP client and configure the Gemini API."""
-        self.session: Optional[ClientSession] = None  # MCP session for communication
-        self.exit_stack = AsyncExitStack()  # Manages async resource cleanup
+        """Initialize the MCP client and Llama 3 (Ollama) configuration."""
+        self.session: Optional[ClientSession] = None
+        self.exit_stack = AsyncExitStack()
 
-        # Retrieve the Gemini API key from environment variables
-        gemini_api_key = os.getenv("GEMINI_API_KEY")
-        if not gemini_api_key:
-            raise ValueError("GEMINI_API_KEY not found. Please add it to your .env file.")
-
-        # Configure the Gemini AI client
-        self.genai_client = genai.Client(api_key=gemini_api_key)
+        # Ollama local model config
+        self.ollama_url = "http://localhost:11434/api/generate"
+        self.model = "llama3:8b"
 
     async def connect_to_server(self, server_script_path: str):
         """Connect to the MCP server and list available tools."""
 
-        # Determine whether the server script is written in Python or JavaScript
-        # This allows us to execute the correct command to start the MCP server
-        command = "python" if server_script_path.endswith('.py') else "node"
-
-        # Define the parameters for connecting to the MCP server
+        command = "python" if server_script_path.endswith(".py") else "node"
         server_params = StdioServerParameters(command=command, args=[server_script_path])
 
-        # Establish communication with the MCP server using standard input/output (stdio)
+        # Establish communication with the MCP server
         stdio_transport = await self.exit_stack.enter_async_context(stdio_client(server_params))
-
-        # Extract the read/write streams from the transport object
         self.stdio, self.write = stdio_transport
 
-        # Initialize the MCP client session, which allows interaction with the server
+        # Create and initialize session
         self.session = await self.exit_stack.enter_async_context(ClientSession(self.stdio, self.write))
-
-        # Send an initialization request to the MCP server
         await self.session.initialize()
 
-        # Request the list of available tools from the MCP server
+        # List available tools
         response = await self.session.list_tools()
-        tools = response.tools  # Extract the tool list from the response
-
-        # Print a message showing the names of the tools available on the server
+        tools = response.tools
         print("\nConnected to server with tools:", [tool.name for tool in tools])
 
-        # Convert MCP tools to Gemini format
-        self.function_declarations = convert_mcp_tools_to_gemini(tools)
+        # Convert tools into readable format for the model
+        self.tool_descriptions = convert_mcp_tools_to_prompt(tools)
 
+    def call_llama_local(self, prompt: str) -> str:
+        """Send a prompt to local Llama 3 (via Ollama) and return the response."""
+        payload = json.dumps({
+            "model": self.model,
+            "prompt": prompt,
+            "stream": False
+        }).encode("utf-8")
+
+        req = urllib.request.Request(
+            self.ollama_url,
+            data=payload,
+            headers={"Content-Type": "application/json"}
+        )
+
+        with urllib.request.urlopen(req) as response:
+            data = json.loads(response.read().decode("utf-8"))
+
+        return data.get("response", "").strip()
+
+    
 
     async def process_query(self, query: str) -> str:
         """
-        Process a user query using the Gemini API and execute tool calls if needed.
-
-        Args:
-            query (str): The user's input query.
-
-        Returns:
-            str: The response generated by the Gemini model.
+        Process a user query using Llama 3 and execute MCP tools automatically
+        when suggested by the model.
         """
+        def build_llama_prompt(self, query: str) -> str:
+            """Create a well-structured prompt that provides context to Llama 3."""
+            return f"""
+                    You are a local AI assistant connected to a Model Context Protocol (MCP) server.
 
-        # Format user input as a structured Content object for Gemini
-        user_prompt_content = types.Content(
-            role='user',  # Indicates that this is a user message
-            parts=[types.Part.from_text(text=query)]  # Convert the text query into a Gemini-compatible format
-        )
+                    The server provides the following tools:
+                    {self.tool_descriptions}
 
-        # Send user input to Gemini AI and include available tools for function calling
-        response = self.genai_client.models.generate_content(
-            model='gemini-2.0-flash-001',  # Specifies which Gemini model to use
-            contents=[user_prompt_content],  # Send user input to Gemini
-            config=types.GenerateContentConfig(
-                tools=self.function_declarations,  # Pass the list of available MCP tools for Gemini to use
-            ),
-        )
+                    Your task:
+                    - Understand the user's request.
+                    - Suggest which MCP tool to use and what arguments might be needed.
+                    - If no tool is needed, just answer the query directly and do not return NoneType.
+                    User query:
+                    {query}
+                    """
 
-        # Initialize variables to store final response text and assistant messages
-        final_text = []  # Stores the final formatted response
-        assistant_message_content = []  # Stores assistant responses
-
-        # Process the response received from Gemini
-        for candidate in response.candidates:
-            if candidate.content.parts:  # Ensure response has content
-                for part in candidate.content.parts:
-                    if isinstance(part, types.Part):  # Check if part is a valid Gemini response unit
-                        if part.function_call:  # If Gemini suggests a function call, process it
-                            # Extract function call details
-                            function_call_part = part  # Store the function call response
-                            tool_name = function_call_part.function_call.name  # Name of the MCP tool Gemini wants to call
-                            tool_args = function_call_part.function_call.args  # Arguments required for the tool execution
-
-                            # Print debug info: Which tool is being called and with what arguments
-                            print(f"\n[Gemini requested tool call: {tool_name} with args {tool_args}]\n\n")
-
-                            # Execute the tool using the MCP server
-                            try:
-                                result = await self.session.call_tool(tool_name, tool_args)  # Call MCP tool with arguments
-                                function_response = {"result": result.content}  # Store the tool's output
-                            except Exception as e:
-                                function_response = {"error": str(e)}  # Handle errors if tool execution fails
-
-                            # Format the tool response for Gemini in a way it understands
-                            function_response_part = types.Part.from_function_response(
-                                name=tool_name,  # Name of the function/tool executed
-                                response=function_response  # The result of the function execution
-                            )
-
-                            # Structure the tool response as a Content object for Gemini
-                            function_response_content = types.Content(
-                                role='tool',  # Specifies that this response comes from a tool
-                                parts=[function_response_part]  # Attach the formatted response part
-                            )
-
-                            # Send tool execution results back to Gemini for processing
-                            response = self.genai_client.models.generate_content(
-                                model='gemini-2.0-flash-001',  # Use the same model
-                                contents=[
-                                    user_prompt_content,  # Include original user query
-                                    function_call_part,  # Include Gemini's function call request
-                                    function_response_content,  # Include tool execution result
-                                ],
-                                config=types.GenerateContentConfig(
-                                    tools=self.function_declarations,  # Provide the available tools for continued use
-                                ),
-                            )
-
-                            # Extract final response text from Gemini after processing the tool call
-                            final_text.append(response.candidates[0].content.parts[0].text)
-                        else:
-                            # If no function call was requested, simply add Gemini's text response
-                            final_text.append(part.text)
-
-        # Return the combined response as a single formatted string
-        return "\n".join(final_text)
+        # Call Llama 3
+        prompt = build_llama_prompt(self, query)
+        response_text = self.call_llama_local(prompt)
+        print("\nLlama 3 Response:\n", response_text)
 
 
     async def chat_loop(self):
-        """Run an interactive chat session with the user."""
+        """Run an interactive REPL chat loop."""
         print("\nMCP Client Started! Type 'quit' to exit.")
-
         while True:
-            query = input("\nQuery: ").strip()
-            if query.lower() == 'quit':
+            query = input("\n Query: ").strip()
+            if query.lower() == "quit":
                 break
-
-            # Process the user's query and display the response
             response = await self.process_query(query)
-            print("\n" + response)
+            try:
+                print("\n" + response)
+            except Exception as e:
+                print(f"Error processing response: {e}")
 
     async def cleanup(self):
-        """Clean up resources before exiting."""
+        """Clean up resources."""
         await self.exit_stack.aclose()
 
+
+# ==========================================================
+# Utility Functions
+# ==========================================================
+
 def clean_schema(schema):
-    """
-    Recursively removes 'title' fields from the JSON schema.
-
-    Args:
-        schema (dict): The schema dictionary.
-
-    Returns:
-        dict: Cleaned schema without 'title' fields.
-    """
+    """Remove unwanted 'title' fields from JSON schema recursively."""
     if isinstance(schema, dict):
-        schema.pop("title", None)  # Remove title if present
-
-        # Recursively clean nested properties
+        schema.pop("title", None)
         if "properties" in schema and isinstance(schema["properties"], dict):
             for key in schema["properties"]:
                 schema["properties"][key] = clean_schema(schema["properties"][key])
-
     return schema
 
-def convert_mcp_tools_to_gemini(mcp_tools):
-    """
-    Converts MCP tool definitions to the correct format for Gemini API function calling.
 
-    Args:
-        mcp_tools (list): List of MCP tool objects with 'name', 'description', and 'inputSchema'.
-
-    Returns:
-        list: List of Gemini Tool objects with properly formatted function declarations.
-    """
-    gemini_tools = []
-
+def convert_mcp_tools_to_prompt(mcp_tools):
+    """Convert MCP tools into natural language format for Llama 3 prompts."""
+    tool_descriptions = []
     for tool in mcp_tools:
-        # Ensure inputSchema is a valid JSON schema and clean it
-        parameters = clean_schema(tool.inputSchema)
-
-        # Construct the function declaration
-        function_declaration = FunctionDeclaration(
-            name=tool.name,
-            description=tool.description,
-            parameters=parameters  # Now correctly formatted
-        )
-
-        # Wrap in a Tool object
-        gemini_tool = Tool(function_declarations=[function_declaration])
-        gemini_tools.append(gemini_tool)
-
-    return gemini_tools
+        schema = clean_schema(tool.inputSchema)
+        tool_text = f"""
+Tool Name: {tool.name}
+Description: {tool.description}
+Expected Input Schema: {json.dumps(schema, indent=2)}
+"""
+        tool_descriptions.append(tool_text.strip())
+    return "\n\n".join(tool_descriptions)
 
 
+# ==========================================================
+# Entry Point
+# ==========================================================
 
 async def main():
-    """Main function to start the MCP client."""
+    """Start the MCP client."""
     if len(sys.argv) < 2:
         print("Usage: python client.py <path_to_server_script>")
         sys.exit(1)
 
     client = MCPClient()
     try:
-        # Connect to the MCP server and start the chat loop
         await client.connect_to_server(sys.argv[1])
         await client.chat_loop()
     finally:
-        # Ensure resources are cleaned up
         await client.cleanup()
 
+
 if __name__ == "__main__":
-    # Run the main function within the asyncio event loop
     asyncio.run(main())
