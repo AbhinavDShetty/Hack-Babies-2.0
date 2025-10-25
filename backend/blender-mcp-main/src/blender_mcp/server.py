@@ -949,4 +949,12 @@ def main():
     mcp.run()
 
 if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser(description="Start Blender MCP Server")
+    parser.add_argument("--host", default="localhost")
+    parser.add_argument("--port", type=int, default=9876)
+    args = parser.parse_args()
+
+    import uvicorn
+    uvicorn.run("blender_mcp_server:mcp", host=args.host, port=args.port, reload=False)
     main()
