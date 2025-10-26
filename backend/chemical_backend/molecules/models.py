@@ -1,3 +1,14 @@
 from django.db import models
 
-# Create your models here.
+class Molecule(models.Model):
+    name = models.CharField(max_length=255)
+    formula = models.CharField(max_length=255)
+    smiles = models.TextField(help_text="SMILES representation of the molecule")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ["-created_at"]
+    
+    def __str__(self):
+        return f"{self.name} ({self.formula})"

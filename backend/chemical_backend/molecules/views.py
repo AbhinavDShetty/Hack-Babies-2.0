@@ -1,7 +1,10 @@
 import subprocess, os
 from django.http import JsonResponse
 from django.conf import settings
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods
 import requests
+from .models import Molecule
 
 def blender_command(request):
     command_type = request.GET.get("type", "get_scene_info")

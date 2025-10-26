@@ -1,0 +1,3 @@
+# Blender MCP dependencies
+mcp>=1.18.0
+python-dotenv>=1.1.1

@@ -26,7 +26,7 @@ class MCPClient:
         self.exit_stack = AsyncExitStack()
 
         # Choose LLaMA model (from .env or default)
-        self.llama_model = os.getenv("LLAMA_MODEL", "llama3")
+        self.llama_model = os.getenv("LLAMA_MODEL", "llama2")
 
     async def connect_to_server(self, server_script_path: str):
         """Connect to the MCP server and list available tools."""
