@@ -60,7 +60,6 @@ import json
 import unicodedata
 
 def normalize_unicode(s: str) -> str:
-    # normalize weird unicode like fullwidth chars, ligatures etc.
     return unicodedata.normalize("NFKC", s)
 
 # Heuristics: token considered "formula-like" -> skip aggressive casing fixes
