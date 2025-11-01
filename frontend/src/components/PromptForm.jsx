@@ -14,6 +14,7 @@ export default function PromptForm({ onJobCreated }) {
       setPrompt("");
     } catch (err) {
       alert("Failed to submit prompt");
+      console.error(err);
     } finally {
       setLoading(false);
     }
