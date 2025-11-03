@@ -1,0 +1,22 @@
+[
+    {
+        "source": "https://docs.blender.org/api/current/bpy.types.Object.html",
+        "description": "Code example from Blender API docs",
+        "code": "import bpy\n\nview_layer = bpy.context.view_layer\n\n# Create new light data-block.\nlight_data = bpy.data.lights.new(name=\"New Light\", type='POINT')\n\n# Create new object with our light data-block.\nlight_object = bpy.data.objects.new(name=\"New Light\", object_data=light_data)\n\n# Link light object to the active collection of current view layer,\n# so that it'll appear in the current scene.\nview_layer.active_layer_collection.collection.objects.link(light_object)\n\n# Place light to a specified location.\nlight_object.location = (5.0, 5.0, 5.0)\n\n# And finally select it and make it active.\nlight_object.select_set(True)\nview_layer.objects.active = light_object"
+    },
+    {
+        "source": "https://docs.blender.org/api/current/bpy.context.html",
+        "description": "Code example from Blender API docs",
+        "code": "# Example inserting keyframe for the hovered property.\nactive_property = bpy.context.property\nif active_property:\n    datablock, data_path, index = active_property\n    datablock.keyframe_insert(data_path=data_path, index=index, frame=1)"
+    },
+    {
+        "source": "https://docs.blender.org/api/current/bpy.data.html",
+        "description": "Code example from Blender API docs",
+        "code": "import bpy\n\n\n# Print all objects.\nfor obj in bpy.data.objects:\n    print(obj.name)\n\n\n# Print all scene names in a list.\nprint(bpy.data.scenes.keys())\n\n\n# Remove mesh Cube.\nif \"Cube\" in bpy.data.meshes:\n    mesh = bpy.data.meshes[\"Cube\"]\n    print(\"removing mesh\", mesh)\n    bpy.data.meshes.remove(mesh)\n\n\n# Write images into a file next to the blend.\nimport os\nwith open(os.path.splitext(bpy.data.filepath)[0] + \".txt\", 'w') as fs:\n    for image in bpy.data.images:\n        fs.write(\"{:s} {:d} x {:d}\\n\".format(image.filepath, image.size[0], image.size[1]))"
+    },
+    {
+        "source": "https://docs.blender.org/api/current/bpy.types.Mesh.html",
+        "description": "Code example from Blender API docs",
+        "code": "import bpy\n\nme = bpy.context.object.data\nuv_layer = me.uv_layers.active.data\n\nfor poly in me.polygons:\n    print(\"Polygon index: {:d}, length: {:d}\".format(poly.index, poly.loop_total))\n\n    # Range is used here to show how the polygons reference loops,\n    # for convenience 'poly.loop_indices' can be used instead.\n    for loop_index in range(poly.loop_start, poly.loop_start + poly.loop_total):\n        print(\"    Vertex: {:d}\".format(me.loops[loop_index].vertex_index))\n        print(\"    UV: {!r}\".format(uv_layer[loop_index].uv))"
+    }
+]
