@@ -1,96 +1,69 @@
+
+import requests
+from .vector_search import fetch_molecule_from_pubchem
+import re
+
+OLLAMA_GENERATE = "http://localhost:11434/api/generate"
+MODEL_NAME = "gpt-oss:20b"
+
+SYSTEM_INSTR = """
+You are an expert 3D model planner for a web app. Given a user prompt and supporting context,
+produce a JSON object ONLY (no extra text) with this schema:
+{
+  "kind": "molecule|general|procedural",
+  "format": "glb|obj|pdb|sdf",
+  "params": { ... } 
+}
+If the prompt is about a molecule, include "smiles" or "name" in params. Keep responses valid JSON.
 """
-LlmAgent: orchestrates RAG retrieval, LLM code generation, validation, and Blender execution.
 
-This implementation:
-- uses the mock Retriever and LlamaClient from this app
-- writes the generated script to a temp folder and calls Blender via subprocess
-- if Blender binary is not present, it simulates output by writing a tiny placeholder .glb file
-"""
+def call_ollama(prompt: str, context: str = "", stream: bool = False, timeout: int = 300):
+    full_prompt = f"{SYSTEM_INSTR}\n\nContext:\n{context}\n\nUser Prompt:\n{prompt}"
+    payload = {
+        "model": MODEL_NAME,
+        "prompt": full_prompt,
+        "stream": stream,
+        # structured format supported by Ollama; optional:
+        "format": "json"
+    }
+    resp = requests.post(OLLAMA_GENERATE, json=payload, timeout=timeout)
+    resp.raise_for_status()
+    data = resp.json()
+    # Ollama returns a "response" key for non-streaming usage (or structured)
+    # If you used format=json, you may get parsed JSON; safest: read .get("response")
+    return data.get("response") if isinstance(data, dict) else data
 
-from pathlib import Path
-import tempfile
-import subprocess
-import os
-import sys
-import shutil
+# def parse_prompt_to_plan(prompt: str) -> dict:
+#     """
+#     Parse a user prompt into a structured plan.
+#     Detects if it's a molecule prompt and tries to get SMILES from PubChem if not given.
+#     """
+#     smiles_match = re.search(r"([A-Za-z0-9@+\-\[\]\(\)=#$]+)", prompt)
+#     molecule_name = None
 
-from .vector_search import Retriever
-from .llm_client import LlamaClient
+#     if "molecule" in prompt.lower() or smiles_match:
+#         if not smiles_match:
+#             # Extract the likely molecule name (e.g., "water", "glucose")
+#             words = prompt.split()
+#             molecule_name = next((w for w in words if w.isalpha()), None)
 
-class LlmAgent:
-    def __init__(self):
-        self.retriever = Retriever()
-        self.llm = LlamaClient()
+#         smiles = smiles_match.group(1) if smiles_match else None
 
-    def build_prompt(self, user_prompt: str, retrieved_docs: list):
-        system = (
-            "You are an assistant that outputs a Blender Python script. The script must:\n"
-            "- import bpy\n"
-            "- define def generate_scene(output_path)\n"
-            "- create geometry and export to GLB using bpy.ops.export_scene.gltf(filepath=output_path)\n"
-            "Return only valid Python code.\n"
-        )
-        context = "\n".join(retrieved_docs or [])
-        return f"{system}\n\nContext:\n{context}\n\nUser:\n{user_prompt}\n\nOutput only code."
+#         # 🔍 Try PubChem lookup if SMILES not found
+#         if not smiles and molecule_name:
+#             info = fetch_molecule_from_pubchem(molecule_name)
+#             smiles = info["smiles"] if info else None
 
-    def run_prompt_and_generate(self, user_prompt: str, job_id: str):
-        # 1. RAG retrieval
-        docs = self.retriever.retrieve(user_prompt, k=5)
+#         return {
+#             "kind": "molecule",
+#             "params": {
+#                 "smiles": smiles,
+#                 "name": molecule_name or "unknown"
+#             }
+#         }
 
-        # 2. Build prompt
-        prompt = self.build_prompt(user_prompt, docs)
-
-        # 3. Ask LLM for code
-        script_text = self.llm.generate_code(prompt, max_tokens=1500)
-
-        # Basic validation
-        if "def generate_scene" not in script_text or "bpy" not in script_text:
-            raise ValueError("LLM output missing required structure (bpy or generate_scene).")
-
-        # Save script file
-        tmpdir = Path(tempfile.gettempdir()) / f"chem3d_job_{job_id}"
-        tmpdir.mkdir(parents=True, exist_ok=True)
-        script_file = tmpdir / "generated_blender_script.py"
-        script_file.write_text(script_text)
-
-        # Prepare output glb path
-        output_glb = tmpdir / "output.glb"
-
-        # Try to run Blender if available; otherwise write a small placeholder GLB
-        blender_exec = shutil.which("blender")  # will be None if blender not in PATH
-        if blender_exec:
-            cmd = [
-                blender_exec,
-                "--background",
-                "--python", str(script_file),
-                "--",
-                "--output", str(output_glb)
-            ]
-            try:
-                subprocess.run(cmd, check=True, timeout=180)
-            except subprocess.CalledProcessError as e:
-                # capture error
-                raise RuntimeError(f"Blender run failed: {e}")
-        else:
-            # No Blender available locally — create a tiny placeholder GLB file so frontend can still test.
-            placeholder = b"GLB_PLACEHOLDER_BINARY_CONTENT"
-            output_glb.write_bytes(placeholder)
-
-        if not output_glb.exists():
-            raise FileNotFoundError("Expected output GLB not found after Blender run.")
-
-        # Optionally: move to Django MEDIA_ROOT if set (so Django can serve it via MEDIA_URL)
-        media_path = None
-        try:
-            from django.conf import settings
-            media_root = getattr(settings, "MEDIA_ROOT", None)
-            if media_root:
-                media_dir = Path(media_root)
-                media_dir.mkdir(parents=True, exist_ok=True)
-                final_path = media_dir / f"job_{job_id}_model.glb"
-                shutil.copy2(output_glb, final_path)
-                media_path = str(final_path)
-        except Exception:
-            media_path = None
-
-        return (media_path if media_path else str(output_glb)), "Model generation finished."
+#     # fallback general 3D object
+#     return {
+#         "kind": "general",
+#         "params": {"description": prompt}
+#     }
