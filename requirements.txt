@@ -22,7 +22,7 @@ tiktoken>=0.7.0
 trimesh>=4.4.0
 pymeshlab>=2023.12
 pythreejs>=2.4.2
-numpy>=1.26.4
+numpy==1.26.4
 pillow>=10.2.0
 celery>=5.4.0
 redis>=5.0.1

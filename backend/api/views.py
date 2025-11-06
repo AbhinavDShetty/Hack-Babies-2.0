@@ -108,6 +108,7 @@ class GenerateModelView(APIView):
                 "status": job.status,
                 "model_url": job.result,
                 "reasoning": reasoning,
+                "mode": "model",
             },
             status=status.HTTP_200_OK,
         )
