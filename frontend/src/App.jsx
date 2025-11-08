@@ -1,23 +1,41 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import "@google/model-viewer/dist/model-viewer.min.js";
 import Header from "./components/Header";
 import Sidebar from "./components/Sidebar";
 import InputBar from "./components/InputBar";
 import ChatBox from "./components/ChatBox";
-import ModelViewer from "./components/ModelViewer";
 import ThreeViewer from "./components/ThreeViewer";
 import HomeGrid from "./components/HomeGrid";
+import BackButton from "./components/BackButton";
 import "./App.css";
 
 function App() {
-  const [mode, setMode] = useState("home");
+  // --- Persistent States ---
+  const [mode, setMode] = useState(() => localStorage.getItem("appMode") || "home");
   const [prompt, setPrompt] = useState("");
-  const [chatHistory, setChatHistory] = useState([]);
-  const [modelUrl, setModelUrl] = useState(null);
+  const [chatHistory, setChatHistory] = useState(() => {
+    const saved = localStorage.getItem("chatHistory");
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [modelUrl, setModelUrl] = useState(() => localStorage.getItem("modelUrl"));
   const [loading, setLoading] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  // --- Save state on change ---
+  useEffect(() => {
+    localStorage.setItem("appMode", mode);
+  }, [mode]);
+
+  useEffect(() => {
+    if (modelUrl) localStorage.setItem("modelUrl", modelUrl);
+  }, [modelUrl]);
+
+  useEffect(() => {
+    localStorage.setItem("chatHistory", JSON.stringify(chatHistory));
+  }, [chatHistory]);
+
+  // --- API Request ---
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!prompt.trim()) return;
@@ -37,7 +55,8 @@ function App() {
 
       if (data.mode === "model") {
         setMode("model");
-        setModelUrl("http://127.0.0.1:8000" + data.model_url);
+        const fullUrl = "http://127.0.0.1:8000" + data.model_url;
+        setModelUrl(fullUrl);
         setChatHistory((prev) => [
           ...prev,
           { sender: "bot", text: data.response },
@@ -74,7 +93,6 @@ function App() {
         {mode === "home" && (
           <>
             <HomeGrid />
-
             <div className="fixed bottom-8 left-1/2 -translate-x-1/2 w-[80%] max-w-[700px] px-4">
               <InputBar
                 prompt={prompt}
@@ -94,6 +112,14 @@ function App() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
             >
+              <BackButton
+                onClick={() => {
+                  setMode("home");
+                  setChatHistory([]);
+                  setModelUrl(null);
+                  localStorage.clear();
+                }}
+              />
               <div className="w-250 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.15)] rounded-2xl overflow-hidden backdrop-blur-md shadow-[0_0_40px_rgba(99,102,241,0.15)]">
                 <ChatBox messages={chatHistory} />
               </div>
@@ -117,16 +143,22 @@ function App() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
           >
-
-
+            <BackButton
+              onClick={() => {
+                setMode("home");
+                setChatHistory([]);
+                setModelUrl(null);
+                localStorage.clear();
+              }}
+            />
 
             {/* Left Model Viewer */}
-            <div className="flex-[0.6] h-full rounded-2xl overflow-hidden border border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.05)] backdrop-blur-md shadow-[0_0_30px_rgba(99,102,241,0.2)]">
+            <div className="flex-[0.6] h-full rounded-2xl overflow-hidden border border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.05)] shadow-[0_0_30px_rgba(99,102,241,0.2)]">
               <ThreeViewer modelPath={modelUrl} />
             </div>
 
             {/* Right Chat Box */}
-            <div className="flex-[0.4] flex flex-col h-full bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.15)] rounded-2xl backdrop-blur-md shadow-[0_0_40px_rgba(99,102,241,0.15)]">
+            <div className="flex-[0.4] flex flex-col h-full bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.15)] rounded-2xl shadow-[0_0_40px_rgba(99,102,241,0.15)]">
               <div className="flex-1 overflow-y-auto p-4 chat-box">
                 <ChatBox messages={chatHistory} />
               </div>

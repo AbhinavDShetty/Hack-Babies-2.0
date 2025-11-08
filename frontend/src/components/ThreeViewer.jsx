@@ -35,28 +35,44 @@ export default function ThreeViewer({ modelPath }) {
     );
     camera.position.set(0, 2, 6);
 
-    // --- Ultra-balanced Environment Lighting (no dark spots) ---
+    // --- Balanced Environment Lighting ---
     const pmremGenerator = new THREE.PMREMGenerator(renderer);
     const envTexture = pmremGenerator.fromScene(new RoomEnvironment(renderer)).texture;
     scene.environment = envTexture;
 
-    // Add a strong ambient light that fills all sides evenly
-    const superAmbient = new THREE.AmbientLight(0xffffff, 2.5);
+    // --- Core Lights ---
+    const superAmbient = new THREE.AmbientLight(0xffffff, 2.8);
     scene.add(superAmbient);
 
-    // Add several directional fill lights from all directions
-    const directions = [
+    const baseDirections = [
       [5, 5, 5],
       [-5, 5, 5],
       [5, 5, -5],
       [-5, 5, -5],
-      [0, -5, 0], // from below to eliminate dark bottoms
+      [0, -5, 0], // bottom fill
     ];
-    directions.forEach(([x, y, z]) => {
-      const light = new THREE.DirectionalLight(0xffffff, 0.8);
+    baseDirections.forEach(([x, y, z]) => {
+      const light = new THREE.DirectionalLight(0xffffff, 1.0);
       light.position.set(x, y, z);
       scene.add(light);
     });
+
+    // --- Additional Highlights ---
+    const topLight = new THREE.DirectionalLight(0xffffff, 1.3);
+    topLight.position.set(0, 8, 0);
+    scene.add(topLight);
+
+    const backLight = new THREE.DirectionalLight(0xffffff, 1.0);
+    backLight.position.set(0, 3, -6);
+    scene.add(backLight);
+
+    const rimLightLeft = new THREE.DirectionalLight(0xffffff, 0.7);
+    rimLightLeft.position.set(-6, 2, 2);
+    scene.add(rimLightLeft);
+
+    const rimLightRight = new THREE.DirectionalLight(0xffffff, 0.7);
+    rimLightRight.position.set(6, 2, 2);
+    scene.add(rimLightRight);
 
     // --- Controls ---
     const controls = new OrbitControls(camera, renderer.domElement);
@@ -88,7 +104,7 @@ export default function ThreeViewer({ modelPath }) {
         model = gltf.scene;
         model.traverse((child) => {
           if (child.isMesh) {
-            child.material.envMapIntensity = 1.3;
+            child.material.envMapIntensity = 1.4;
             child.material.needsUpdate = true;
           }
         });
@@ -120,7 +136,6 @@ export default function ThreeViewer({ modelPath }) {
         autoRotate = true;
       }
 
-      // Subtle rotation + floating if autoRotate is true
       if (model && autoRotate) {
         model.rotation.y += 0.0025;
         model.position.y = Math.sin(elapsed * 0.5) * 0.03;
@@ -145,8 +160,7 @@ export default function ThreeViewer({ modelPath }) {
     <div
       ref={containerRef}
       className="w-full h-full rounded-2xl overflow-hidden border border-[rgba(255,255,255,0.12)] 
-                 bg-[rgba(255,255,255,0.05)] backdrop-blur-md 
-                 shadow-[0_0_30px_rgba(99,102,241,0.2)]"
+                 bg-transparent"
     />
   );
 }

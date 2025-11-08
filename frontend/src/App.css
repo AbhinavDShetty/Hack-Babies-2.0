@@ -131,6 +131,15 @@ body, html, #root {
 }
 
 /* ========== HOME GRID ========== */
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
 .home-grid-section {
   width: 100%;
   padding: 3rem 2rem 6rem;
