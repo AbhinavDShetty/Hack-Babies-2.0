@@ -40,6 +40,7 @@ def parse_prompt_to_plan(prompt: str):
 
     smiles = result.get("smiles")
     reasoning = result.get("reasoning", "")
+    response = result.get("response", "")
 
     if not smiles:
         # ask LLM
@@ -48,6 +49,7 @@ def parse_prompt_to_plan(prompt: str):
             resp = query_llm(llm_prompt, timeout=180, retries=1)
             smiles = extract_smiles_from_text(resp or "")
             reasoning += "\n(LLM inferred SMILES)"
+            response += resp.response or ""
         except Exception as e:
             print("LLM timeout/failure:", e)
 
@@ -64,7 +66,7 @@ def parse_prompt_to_plan(prompt: str):
     if not smiles:
         raise ValueError("Could not find SMILES for prompt.")
 
-    return {"kind":"molecule","params":{"smiles":smiles},"reasoning":reasoning}
+    return {"kind":"molecule","params":{"smiles":smiles},"reasoning":reasoning, "response": response}
 
 
 

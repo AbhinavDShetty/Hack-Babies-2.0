@@ -23,7 +23,8 @@ export default function Header({ onSidebarToggle }) {
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
       >
-        <div className="logo">🧬 Hack Babies</div>
+        <div className="logo">🧬 Hack Babies Presents</div>
+        <div className="logo title">Project Name</div>
       </motion.div>
     </>
   );

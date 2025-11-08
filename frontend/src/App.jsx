@@ -6,6 +6,7 @@ import Sidebar from "./components/Sidebar";
 import InputBar from "./components/InputBar";
 import ChatBox from "./components/ChatBox";
 import ModelViewer from "./components/ModelViewer";
+import ThreeViewer from "./components/ThreeViewer";
 import HomeGrid from "./components/HomeGrid";
 import "./App.css";
 
@@ -39,7 +40,7 @@ function App() {
         setModelUrl("http://127.0.0.1:8000" + data.model_url);
         setChatHistory((prev) => [
           ...prev,
-          { sender: "bot", text: data.response || "Here’s your 3D model!" },
+          { sender: "bot", text: data.response },
         ]);
       } else {
         setMode("chat");
@@ -73,6 +74,7 @@ function App() {
         {mode === "home" && (
           <>
             <HomeGrid />
+
             <div className="fixed bottom-8 left-1/2 -translate-x-1/2 w-[80%] max-w-[700px] px-4">
               <InputBar
                 prompt={prompt}
@@ -115,11 +117,16 @@ function App() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
           >
-            <div className="flex-[0.6] bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.15)] rounded-2xl overflow-hidden backdrop-blur-md shadow-[0_0_40px_rgba(99,102,241,0.15)] p-2">
-              <ModelViewer src={modelUrl} />
+
+
+
+            {/* Left Model Viewer */}
+            <div className="flex-[0.6] h-full rounded-2xl overflow-hidden border border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.05)] backdrop-blur-md shadow-[0_0_30px_rgba(99,102,241,0.2)]">
+              <ThreeViewer modelPath={modelUrl} />
             </div>
 
-            <div className="flex-[0.4] flex flex-col bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.15)] rounded-2xl backdrop-blur-md shadow-[0_0_40px_rgba(99,102,241,0.15)]">
+            {/* Right Chat Box */}
+            <div className="flex-[0.4] flex flex-col h-full bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.15)] rounded-2xl backdrop-blur-md shadow-[0_0_40px_rgba(99,102,241,0.15)]">
               <div className="flex-1 overflow-y-auto p-4 chat-box">
                 <ChatBox messages={chatHistory} />
               </div>

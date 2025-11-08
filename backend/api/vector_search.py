@@ -90,7 +90,7 @@ def retrieve_with_reasoning(prompt: str):
     context = retrieve_context(prompt)
     llm_prompt = f"""
 You are a chemistry assistant. Based on the following context and user query,
-output a JSON object with keys: 'smiles' and 'reasoning'.
+output a JSON object with keys: 'smiles' and 'reasoning' and 'response'.
 
 Context:
 {context}
@@ -102,6 +102,7 @@ Example:
 {{
     "smiles": "CCO",
     "reasoning": "User asked for rubbing alcohol, which is ethanol."
+    "response": "Ethanol is a common molecule used in rubbing alcohol. Here is the 3D model of ethanol."
 }}
 """
 
@@ -113,6 +114,7 @@ Example:
 
     smiles = ""
     reasoning = ""
+    response = ""
 
     # Try to parse LLM JSON
     if response_text:
@@ -122,10 +124,13 @@ Example:
                 data = json.loads(match.group(0))
                 smiles = data.get("smiles", "")
                 reasoning = data.get("reasoning", "")
+                response = data.get("response", "")
             else:
                 reasoning = response_text.strip()
+                response = response_text.strip()
         except Exception:
             reasoning = response_text.strip()
+            response = response_text.strip()
 
     # Fallback to PubChem if LLM failed
     if not smiles:
@@ -133,7 +138,9 @@ Example:
         if pubchem_data:
             smiles = pubchem_data.get("smiles", "")
             reasoning += f"\n(Fetched from PubChem: {pubchem_data.get('desc')})"
+            response += f"\nHere is the 3D model of {pubchem_data.get('name')}."
         else:
             reasoning += "\n⚠️ Could not find molecule in PubChem."
+            response += "\nSorry, I couldn't find the molecule you're looking for."
 
-    return {"smiles": smiles, "reasoning": reasoning}
+    return {"smiles": smiles, "reasoning": reasoning, "response": response}
