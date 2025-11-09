@@ -31,16 +31,17 @@ def extract_smiles_from_text(text: str) -> str:
 
 # in generator.py (imports)
 
-def parse_prompt_to_plan(prompt: str):
+def parse_prompt_to_plan(prompt: str, chat_history: str = "") -> dict:
     result = {}
     try:
-        result = retrieve_with_reasoning(prompt) or {}
+        result = retrieve_with_reasoning(prompt, chat_history) or {}
     except Exception as e:
         print("RAG failed:", e)
 
     smiles = result.get("smiles")
     reasoning = result.get("reasoning", "")
     response = result.get("response", "")
+    title = result.get("title", "")
 
     if not smiles:
         # ask LLM
@@ -49,7 +50,7 @@ def parse_prompt_to_plan(prompt: str):
             resp = query_llm(llm_prompt, timeout=180, retries=1)
             smiles = extract_smiles_from_text(resp or "")
             reasoning += "\n(LLM inferred SMILES)"
-            response += resp.response or ""
+            title += resp.title or ""
         except Exception as e:
             print("LLM timeout/failure:", e)
 
@@ -66,7 +67,7 @@ def parse_prompt_to_plan(prompt: str):
     if not smiles:
         raise ValueError("Could not find SMILES for prompt.")
 
-    return {"kind":"molecule","params":{"smiles":smiles},"reasoning":reasoning, "response": response}
+    return {"kind":"molecule","params":{"smiles":smiles},"reasoning":reasoning, "response": response, "title": title}
 
 
 
