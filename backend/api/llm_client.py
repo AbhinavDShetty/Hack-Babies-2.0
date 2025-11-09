@@ -7,12 +7,13 @@ OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434/api/generate")
 # preferred model; set via env if you want to change without code
 MODEL_NAME = os.getenv("OLLAMA_MODEL", "gpt-oss:20b")
 
-def query_llm(prompt: str, timeout=180, retries=2, backoff=2):
+
+def query_llm(prompt: str, timeout=180, retries=2, backoff=2, model_name: str = MODEL_NAME) -> str:
     """
     Query local Ollama with retries and backoff. Returns text or raises.
     """
     payload = {
-        "model": MODEL_NAME,
+        "model": model_name,
         "prompt": prompt,
         "stream": False
     }
@@ -25,6 +26,7 @@ def query_llm(prompt: str, timeout=180, retries=2, backoff=2):
             # adjust based on the shape of Ollama response in your setup:
             # many Ollama setups return {"id":..., "response": "..."} or similar
             # adapt the key below if necessary
+            print(f"LLM response data (model: {model_name}) : {data}")
             if isinstance(data, dict):
                 # try common fields
                 return data.get("response") or data.get("output") or data.get("message") or str(data)

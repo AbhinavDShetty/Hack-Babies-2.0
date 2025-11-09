@@ -10,9 +10,11 @@ SYSTEM_INSTR = """
 You are an expert 3D model planner for a web app. Given a user prompt and supporting context,
 produce a JSON object ONLY (no extra text) with this schema:
 {
+  "title": "A Short descriptive title",
+  "description": "Detailed description of the model"
   "kind": "molecule|general|procedural",
   "format": "glb|obj|pdb|sdf",
-  "params": { ... } 
+  "params": { ... } ,
 }
 If the prompt is about a molecule, include "smiles" or "name" in params. Keep responses valid JSON.
 """
