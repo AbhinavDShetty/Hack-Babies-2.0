@@ -1,13 +1,14 @@
 # backend/api/agents.py
 import json
 import time
+import os
 import re
 import requests
 from typing import Dict, Any, Optional, List
 from django.conf import settings
 from .prompts import PROMPT_REGISTRY
 from .models import Conversation, Message
-from .generator import parse_prompt_to_plan, generate_from_plan
+from .generator import parse_prompt_to_plan, generate_from_plan, clean_glb_path
 from .reaction_animator import generate_reaction_animation
 from colorama import Fore, Style
 
@@ -160,7 +161,7 @@ class OrchestratorAgent(BaseAgent):
             parsed = json.loads(json_block)
         except Exception as e:
             print("⚠️ [DEBUG] JSON parsing failed:", e)
-            parsed = {"run_chat": True, "run_model": False, "run_reaction": False, "reason": "fallback"}
+            parsed = {"run_chat": False, "run_model": False, "run_reaction": True, "reason": "fallback"}
 
         save_message(self.conversation, "agent1", json.dumps(parsed), parsed)
         return parsed
@@ -229,95 +230,96 @@ class ReactionGeneratorAgent(BaseAgent):
         instructions: Optional[str] = None,
         provided_reaction: Optional[str] = None
     ) -> Dict[str, Any]:
+        import re
+        print("\n==============================")
+        print("⚗️  [ReactionGeneratorAgent] Starting Reaction Generation")
+        print("==============================")
+
+        def safe_parse_json(text: str) -> dict:
+            """Try to extract and load a JSON block even if the LLM adds noise."""
+            if not text:
+                return {}
+            try:
+                return json.loads(text)
+            except Exception:
+                # Find JSON-like content between braces
+                match = re.search(r"\{[\s\S]*\}", text)
+                if match:
+                    try:
+                        return json.loads(match.group(0))
+                    except Exception:
+                        pass
+            return {}
+
         try:
             system = PROMPT_REGISTRY["reaction"]
 
-            # 🧠 Step 1 — Strongly constrained prompt
+            # --- Step 1: Build robust prompt ---
             llm_prompt = f"""
 You are a chemistry reaction prediction agent.
-
-Task:
-Predict or format the reaction below and output ONLY a JSON object. No text, no Markdown.
-
 User query: "{user_text}"
 
-Ensure your output starts with '{{' and ends with '}}'.
-Follow this exact JSON schema:
+Respond ONLY with valid JSON following this schema:
 {{
   "reaction": "A + B → C + D",
   "reactants": ["A", "B"],
   "products": ["C", "D"],
   "reasoning": "Short explanation"
 }}
+Start your response with '{{' and end with '}}'. No extra text or Markdown.
 """
 
-            # 🧩 Step 2 — Call Ollama (first try)
-            out = call_llm(prompt=llm_prompt, system=system, json_mode=True)
+            # --- Step 2: Call Ollama ---
+            raw_out = call_llm(prompt=llm_prompt, system=system, json_mode=False)
+            print(f"🧠 [Raw LLM Output Preview]:\n{str(raw_out)[:200]}...\n")
 
-            # 🧪 Step 3 — Validate JSON
-            if not isinstance(out, dict):
-                print("⚠️ [ReactionAgent] Non-JSON output received, attempting extraction...")
-                import re
-                match = re.search(r"\{[\s\S]*\}", str(out))
-                if match:
-                    try:
-                        out = json.loads(match.group(0))
-                    except Exception as e:
-                        print("⚠️ [ReactionAgent] JSON parsing failed:", e)
-                        out = {}
-                else:
-                    out = {}
+            out = safe_parse_json(str(raw_out))
 
-            # 🧩 Step 4 — Retry if empty
-            reaction_text = out.get("reaction", "")
-            reactants = out.get("reactants", [])
-            products = out.get("products", [])
+            # --- Step 3: Retry once if invalid ---
+            if not out or not out.get("reaction"):
+                print("⚠️ [ReactionAgent] First attempt invalid or empty — retrying...")
+                retry_raw = call_llm(prompt=llm_prompt, system=system, json_mode=False)
+                out = safe_parse_json(str(retry_raw))
 
-            if not reaction_text and not reactants and not products:
-                print("⚠️ [ReactionAgent] Empty JSON returned — retrying once...")
-                out_retry = call_llm(prompt=llm_prompt, system=system, json_mode=True)
-                if isinstance(out_retry, dict):
-                    out = out_retry
-                else:
-                    try:
-                        match = re.search(r"\{[\s\S]*\}", str(out_retry))
-                        if match:
-                            out = json.loads(match.group(0))
-                    except Exception:
-                        pass
-
-            # 🧪 Step 5 — Apply fallback if still empty
-            reaction_text = out.get("reaction", "")
-            reactants = out.get("reactants", [])
-            products = out.get("products", [])
-            if not reaction_text and not reactants and not products:
+            # --- Step 4: Fallback if still empty ---
+            if not out or not out.get("reaction"):
                 print("⚠️ [ReactionAgent] Using fallback neutralization reaction.")
                 out = {
                     "reaction": "NaOH + HCl → NaCl + H2O",
                     "reactants": ["NaOH", "HCl"],
                     "products": ["NaCl", "H2O"],
-                    "reasoning": "Fallback: neutralization of base and acid forms salt and water."
+                    "reasoning": "Fallback: acid-base neutralization forms salt and water."
                 }
 
-            # 🧬 Step 6 — Generate GLBs
+            # --- Step 5: Print debug summary ---
+            print(f"🧪 Reaction: {out['reaction']}")
+            print(f"🔹 Reactants: {out['reactants']}")
+            print(f"🔸 Products: {out['products']}")
+
+            # --- Step 6: Generate GLBs (with caching + auto-fix) ---
             reactant_glbs, product_glbs = [], []
 
-            for r in out.get("reactants", []):
-                plan = parse_prompt_to_plan(r)
-                glb = generate_from_plan(plan)
-                clean_path = glb.replace(str(settings.MEDIA_ROOT), "").replace("\\", "/")
-                reactant_glbs.append(f"/media{clean_path}")
+            for label, mols in [("Reactants", out["reactants"]), ("Products", out["products"])]:
+                for m in mols:
+                    try:
+                        plan = parse_prompt_to_plan(m)
+                        glb_path = generate_from_plan(plan)
+                        clean_path = clean_glb_path(glb_path)
+                        if label == "Reactants":
+                            reactant_glbs.append(clean_path)
+                        else:
+                            product_glbs.append(clean_path)
+                        
+                        print(f"✅ [ModelGenerator] GLB ready for {m}: {clean_path}")
+                    except Exception as e:
+                        print(f"❌ [ModelGenerator] Failed for {m}: {e}")
 
-            for p in out.get("products", []):
-                plan = parse_prompt_to_plan(p)
-                glb = generate_from_plan(plan)
-                clean_path = glb.replace(str(settings.MEDIA_ROOT), "").replace("\\", "/")
-                product_glbs.append(f"/media{clean_path}")
-
-            # 🧩 Step 7 — Animate
+            # --- Step 7: Animate reaction ---
+            print("🌀 Generating reaction animation frames...")
             animation = generate_reaction_animation(reactant_glbs, product_glbs)
+            print(f"🧬 Generated {len(animation.get('frames', []))} frames.")
 
-            # 🧾 Step 8 — Merge results
+            # --- Step 8: Final structured result ---
             result = {
                 "reaction": out["reaction"].replace("->", "→"),
                 "reactants": out["reactants"],
@@ -326,15 +328,16 @@ Follow this exact JSON schema:
                 **animation,
             }
 
-            # 💾 Step 9 — Save conversation
             save_message(self.conversation, "agent4", json.dumps(result), payload=result)
             print(f"✅ [ReactionAgent] Final reaction: {result['reaction']}")
+            print("==============================\n")
             return result
 
         except Exception as e:
             print("⚠️ Reaction generation failed:", e)
             save_message(self.conversation, "agent4", f"Error: {e}")
             return {"error": str(e)}
+
 
 
 
@@ -426,6 +429,38 @@ def run_workflow(conversation: Conversation, user_text: str) -> Dict[str, Any]:
     }
 
 
+# -------------------------
+# ✅ Path Normalization Helper (Final Version)
+# -------------------------
+def clean_glb_path(path: str) -> str:
+    """
+    Normalizes GLB file paths for consistent /media/models/... URLs.
+    Fixes:
+    - Windows backslashes
+    - Missing 'm' in 'models' ('odels' bug)
+    - Ensures proper /media/ prefix
+    """
+    if not path:
+        return ""
+
+    # Normalize Windows vs Linux slashes
+    normalized = os.path.normpath(path)
+
+    # Strip MEDIA_ROOT prefix if present
+    relative = normalized.replace(str(settings.MEDIA_ROOT), "")
+    relative = relative.lstrip("\\/").replace("\\", "/")
+
+    # Fix missing 'm' typo
+    if "/odels/" in relative:
+        relative = relative.replace("/odels/", "/models/")
+
+    # Always ensure /media prefix
+    if not relative.startswith("media/") and not relative.startswith("/media/"):
+        relative = f"media/{relative.lstrip('/')}"
+
+    # Final clean output
+    clean_url = f"/{relative.strip('/')}"
+    return clean_url
 
 
 

@@ -7,6 +7,7 @@ import trimesh
 from django.conf import settings
 from .vector_search import retrieve_with_reasoning, fetch_molecule_from_pubchem
 from .llm_client import query_llm
+from .cache_index import set_cached_path 
 
 
 # Try to import RDKit
@@ -231,25 +232,50 @@ def rdkit_to_glb(smiles, output_dir=None):
     combined.export(output_path)
     print("Saving GLB at:", output_path)
     
+    safe_key = re.sub(r"[^a-zA-Z0-9_.-]", "_", smiles)
+    rel_path = output_path.replace(str(settings.MEDIA_ROOT), "").replace("\\", "/")
+    set_cached_path(safe_key, f"/media{rel_path}")
+    
     return output_path
 
 
 # ----------------------------- Step 3: Dispatcher -----------------------------
 
 def generate_from_plan(plan: dict) -> str:
-    """Executes the generation plan and returns GLB file path."""
+    """
+    Executes the molecule generation plan and ensures a valid .glb is produced.
+    If the file already exists, reuse it. Otherwise, generate a new one safely.
+    """
     kind = plan.get("kind", "general")
     params = plan.get("params", {})
 
     if kind == "molecule":
         if not _RDKit_AVAILABLE:
-            raise RuntimeError("RDKit is not installed in this environment.")
-        
+            raise RuntimeError("⚠️ RDKit is not installed in this environment.")
+
         smiles = params.get("smiles")
         if not smiles:
-            raise ValueError("No SMILES provided for molecule generation.")
-        
-        return rdkit_to_glb(smiles)
+            raise ValueError("❌ No SMILES provided for molecule generation.")
+
+        # Sanitize and name the GLB file
+        safe_name = re.sub(r"[^a-zA-Z0-9_.-]", "_", smiles)
+        models_dir = os.path.join(settings.MEDIA_ROOT, "models")
+        os.makedirs(models_dir, exist_ok=True)
+        glb_path = os.path.join(models_dir, f"{safe_name}.glb")
+
+        # ✅ Reuse cached GLB if it already exists
+        if os.path.exists(glb_path):
+            print(f"✅ [ModelGenerator] Using cached model: {os.path.basename(glb_path)}")
+            return glb_path
+
+        # 🧬 Otherwise, generate new GLB
+        try:
+            print(f"🧪 [ModelGenerator] Generating 3D model for: {smiles}")
+            return rdkit_to_glb(smiles, output_dir=models_dir)
+
+        except Exception as e:
+            print(f"❌ [ModelGenerator] Failed to generate {smiles}: {e}")
+            raise
 
     elif kind in ("general", "procedural"):
         static_path = os.path.join(settings.STATIC_ROOT, "example.glb")
@@ -261,10 +287,12 @@ def generate_from_plan(plan: dict) -> str:
         raise ValueError(f"Unknown plan kind: {kind}")
 
 
-
-
-
-
+def clean_glb_path(path: str) -> str:
+    """Normalize and fix GLB paths to avoid \\ or missing /models/ issues."""
+    clean = path.replace("\\", "/").replace("//", "/")
+    if not clean.startswith("/media/models/"):
+        clean = "/media/models/" + os.path.basename(clean)
+    return clean
 
 # import tempfile
 # import os
