@@ -23,24 +23,56 @@ class Job(models.Model):
         return f"Job {self.id} - {self.status}"
     
 class ChatSession(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="chat_sessions")
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="chat_sessions"
+    )
     title = models.CharField(max_length=255)
-    mode = models.CharField(max_length=20, choices=[("chat", "Chat"), ("model", "Model")])
-    related_model = models.ForeignKey("ModelTemplate", null=True, blank=True, on_delete=models.SET_NULL)
+
+    linked_models = models.ManyToManyField(
+        "ModelTemplate",
+        related_name="chat_sessions",
+        blank=True
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.title} ({self.mode})"
+        return f"Chat: {self.title} ({self.user.username})"
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "title": self.title,
+            "user": self.user.username,
+            "created_at": self.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+            "models": [m.to_dict() for m in self.linked_models.all()],
+        }
+
+
+
 
 
 class ChatMessage(models.Model):
     session = models.ForeignKey(ChatSession, on_delete=models.CASCADE, related_name="messages")
     sender = models.CharField(max_length=10, choices=[("user", "User"), ("bot", "Bot")])
     text = models.TextField()
+    model_ref = models.ForeignKey("ModelTemplate", null=True, blank=True, on_delete=models.SET_NULL, related_name="messages")
     timestamp = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.sender}: {self.text[:40]}..."
+        short = (self.text[:50] + "...") if len(self.text) > 50 else self.text
+        return f"[{self.sender}] {short}"
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "sender": self.sender,
+            "text": self.text,
+            "timestamp": self.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
+            "model_ref": self.model_ref.to_dict() if self.model_ref else None,
+        }
 
 class ModelTemplate(models.Model):
     CATEGORY_CHOICES = [

@@ -18,56 +18,101 @@ import pyrender
 from PIL import Image, ImageDraw
 import numpy as np
 
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from .models import ChatSession, ChatMessage, ModelTemplate
+
+
 def get_chat(request, chat_id):
-    chat = ChatSession.objects.get(id=chat_id)
-    messages = chat.messages.order_by("timestamp")
-    return JsonResponse({
-        "id": chat.id,
-        "mode": chat.mode,
-        "model_url": chat.related_model.model_file.url if chat.related_model else None,
-        "messages": [{"sender": m.sender, "text": m.text} for m in messages],
-    })
+    """
+    Return a specific chat session with all its messages and linked models.
+    """
+    try:
+        chat = ChatSession.objects.get(id=chat_id)
+        messages = chat.messages.order_by("timestamp")
+        linked_models = chat.linked_models.all()
+
+        return JsonResponse({
+            "id": chat.id,
+            "title": chat.title,
+            "created_at": chat.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+            "models": [m.to_dict() for m in linked_models],
+            "messages": [m.to_dict() for m in messages],
+        })
+    except ChatSession.DoesNotExist:
+        return JsonResponse({"error": "Chat not found"}, status=404)
+
 
 def get_model_chat(request):
+    """
+    Return the most recent chat containing a specific model (by name).
+    """
     model_name = request.GET.get("model_name")
     if not model_name:
         return JsonResponse({"error": "model_name required"}, status=400)
-    chat = ChatSession.objects.filter(
-        related_model__name__iexact=model_name
-    ).order_by("-created_at").first()
+
+    chat = (
+        ChatSession.objects.filter(linked_models__name__iexact=model_name)
+        .order_by("-created_at")
+        .first()
+    )
+
     if not chat:
         return JsonResponse({"chat_id": None})
+
     return JsonResponse({
         "chat_id": chat.id,
-        "messages": [{"sender": m.sender, "text": m.text} for m in chat.messages.order_by("timestamp")],
+        "title": chat.title,
+        "models": [m.to_dict() for m in chat.linked_models.all()],
+        "messages": [m.to_dict() for m in chat.messages.order_by("timestamp")],
     })
 
+
 def get_user_sessions(request, user_id):
+    """
+    Return all chats for a user, sorted by most recent,
+    showing basic info + first model preview if available.
+    """
     sessions = ChatSession.objects.filter(user_id=user_id).order_by("-created_at")
-    data = [
-        {
+
+    data = []
+    for s in sessions:
+        linked = s.linked_models.all()
+        first_model = linked.first() if linked.exists() else None
+
+        data.append({
             "id": s.id,
             "title": s.title,
-            "mode": s.mode,
-            "model_name": s.related_model.name if s.related_model else None,
-            "model_url": s.related_model.model_file.url if s.related_model else None,
-            "thumbnail": s.related_model.thumbnail.url if s.related_model and s.related_model.thumbnail else None,
             "created_at": s.created_at.strftime("%Y-%m-%d %H:%M:%S"),
-        }
-        for s in sessions
-    ]
+            "model_name": first_model.name if first_model else None,
+            "model_url": first_model.model_file.url if first_model else None,
+            "thumbnail": (
+                first_model.thumbnail.url if first_model and first_model.thumbnail else None
+            ),
+        })
+
     return JsonResponse(data, safe=False)
 
 
 @csrf_exempt
 def delete_chat_session(request, chat_id):
+    """
+    Delete a chat session and clear any model associations.
+    """
     if request.method == "DELETE":
         try:
-            ChatSession.objects.filter(id=chat_id).delete()
+            chat = ChatSession.objects.filter(id=chat_id).first()
+            if not chat:
+                return JsonResponse({"error": "Chat not found"}, status=404)
+
+            chat.linked_models.clear()  # remove associations but not models
+            chat.delete()
             return JsonResponse({"success": True})
         except Exception as e:
             return JsonResponse({"error": str(e)}, status=500)
+
     return JsonResponse({"error": "Invalid method"}, status=405)
+
 
 def generate_thumbnail_from_glb(glb_path, output_path, size=(512, 512)):
     """
@@ -245,11 +290,6 @@ class NoteDelete(generics.DestroyAPIView):
 
 
 
-class CreateUserView(generics.CreateAPIView):
-    queryset = User.objects.all()
-    serializer_class = UserSerializer
-    permission_classes = [AllowAny]
-
 class GenerateModelView(APIView):
     def post(self, request):
         prompt = request.data.get("prompt", "").strip()
@@ -317,19 +357,18 @@ class GenerateModelView(APIView):
                 answer = response_data.get("answer", "Sorry, I couldn't find an answer.")
                 title = response_data.get("title", prompt[:30])
 
-                # Continue same chat session if already in chat mode
-                if existing_chat and existing_chat.mode == "chat":
+                # Continue same chat session if it exists
+                if existing_chat:
                     ChatMessage.objects.bulk_create([
                         ChatMessage(session=existing_chat, sender="user", text=prompt),
                         ChatMessage(session=existing_chat, sender="bot", text=answer),
                     ])
                     chat_session = existing_chat
                 else:
-                    # Create new chat only if from home (no existing_chat)
+                    # Create a new chat only if from home (no existing_chat)
                     chat_session = ChatSession.objects.create(
                         user=user,
                         title=title,
-                        mode="chat"
                     )
                     ChatMessage.objects.bulk_create([
                         ChatMessage(session=chat_session, sender="user", text=prompt),
@@ -360,21 +399,24 @@ class GenerateModelView(APIView):
                 if existing_match:
                     print(f"♻️ Found existing model match: {existing_match.name}")
 
-                    model_chat = ChatSession.objects.filter(
-                        user=user, related_model=existing_match, mode="model"
-                    ).first()
+                    # Reuse existing chat or create a new one
+                    chat_session = existing_chat or ChatSession.objects.create(
+                        user=user,
+                        title=existing_match.name,
+                    )
 
-                    if not model_chat:
-                        model_chat = ChatSession.objects.create(
-                            user=user,
-                            title=existing_match.name,
-                            mode="model",
-                            related_model=existing_match,
-                        )
+                    # ✅ Link this model to the session (many-to-many)
+                    chat_session.linked_models.add(existing_match)
 
+                    # Save messages referencing this model
                     ChatMessage.objects.bulk_create([
-                        ChatMessage(session=model_chat, sender="user", text=prompt),
-                        ChatMessage(session=model_chat, sender="bot", text=check_result["response"]),
+                        ChatMessage(session=chat_session, sender="user", text=prompt),
+                        ChatMessage(
+                            session=chat_session,
+                            sender="bot",
+                            text=check_result["response"],
+                            model_ref=existing_match,
+                        ),
                     ])
 
                     job.status = "completed"
@@ -384,11 +426,15 @@ class GenerateModelView(APIView):
                     return Response(
                         {
                             "mode": "model",
-                            "response": check_result["response"] + "\n" + existing_match.description,
+                            "response": check_result["response"]
+                            + "\n"
+                            + existing_match.description,
                             "reasoning": f"Matched existing model '{existing_match.name}'",
                             "model_url": existing_match.model_file.url,
-                            "thumbnail": existing_match.thumbnail.url if existing_match.thumbnail else None,
-                            "chat_id": model_chat.id,
+                            "thumbnail": existing_match.thumbnail.url
+                            if existing_match.thumbnail
+                            else None,
+                            "chat_id": chat_session.id,
                             "reused": True,
                         },
                         status=status.HTTP_200_OK,
@@ -422,20 +468,24 @@ class GenerateModelView(APIView):
                 model_file=rel_path,
             )
 
-            # --- Chat session for new model ---
-            if existing_chat and existing_chat.mode == "model" and existing_chat.related_model == model_instance:
-                chat_session = existing_chat
-            else:
-                chat_session = ChatSession.objects.create(
-                    user=user,
-                    title=model_instance.name,
-                    mode="model",
-                    related_model=model_instance,
-                )
+            # --- Chat session linking ---
+            chat_session = existing_chat or ChatSession.objects.create(
+                user=user,
+                title=model_instance.name,
+            )
 
+            # ✅ Add this new model to linked_models
+            chat_session.linked_models.add(model_instance)
+
+            # Save messages (associate bot reply to this model)
             ChatMessage.objects.bulk_create([
                 ChatMessage(session=chat_session, sender="user", text=prompt),
-                ChatMessage(session=chat_session, sender="bot", text=plan.get("response", "")),
+                ChatMessage(
+                    session=chat_session,
+                    sender="bot",
+                    text=plan.get("response", ""),
+                    model_ref=model_instance,
+                ),
             ])
 
             job.status = "completed"
@@ -471,6 +521,7 @@ class GenerateModelView(APIView):
                 {"error": str(e), "trace": traceback.format_exc()},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
 
           
 
