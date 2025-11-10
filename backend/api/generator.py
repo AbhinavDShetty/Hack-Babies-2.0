@@ -93,23 +93,25 @@ def rdkit_to_glb(smiles, output_dir=None):
     positions = np.array([list(conf.GetAtomPosition(i)) for i in range(len(atoms))])
 
     atom_colors = {
-        "H": [1.0, 1.0, 1.0],      # White
-        "C": [0.2, 0.2, 0.2],      # Dark Gray
-        "N": [0.0, 0.0, 1.0],      # Blue
-        "O": [1.0, 0.0, 0.0],      # Red
-        "F": [0.0, 1.0, 0.0],      # Green
-        "Cl": [0.0, 1.0, 0.0],     # Green
-        "Br": [0.6, 0.2, 0.2],     # Dark Red
-        "I": [0.4, 0.0, 0.8],      # Purple
-        "P": [1.0, 0.5, 0.0],      # Orange
-        "S": [1.0, 1.0, 0.2],      # Yellow
-        "B": [1.0, 0.7, 0.7],      # Light Pink
-        "Si": [0.5, 0.5, 0.5],     # Gray
-        "Fe": [1.0, 0.6, 0.2],     # Brownish
+        "H": [1.0, 1.0, 1.0],
+        "C": [0.2, 0.2, 0.2],
+        "N": [0.0, 0.0, 1.0],
+        "O": [1.0, 0.0, 0.0],
+        "F": [0.0, 1.0, 0.0],
+        "Cl": [0.0, 1.0, 0.0],
+        "Br": [0.6, 0.2, 0.2],
+        "I": [0.4, 0.0, 0.8],
+        "P": [1.0, 0.5, 0.0],
+        "S": [1.0, 1.0, 0.2],
+        "B": [1.0, 0.7, 0.7],
+        "Si": [0.5, 0.5, 0.5],
+        "Fe": [1.0, 0.6, 0.2],
     }
 
     atom_meshes = []
     bond_meshes = []
+    atom_data = []   # 🧬 Store atom info
+    bond_data = []   # 🔗 Store bond info
     bond_radius = 0.04
     bond_offset = 0.09
 
@@ -117,10 +119,19 @@ def rdkit_to_glb(smiles, output_dir=None):
     for atom, pos in zip(atoms, positions):
         color = atom_colors.get(atom, [0.5, 0.5, 0.5])
         radius = 0.25 if atom != "H" else 0.15
+
         sphere = trimesh.creation.icosphere(subdivisions=3, radius=radius)
         sphere.apply_translation(pos)
         sphere.visual.vertex_colors = np.tile(np.array(color) * 255, (len(sphere.vertices), 1))
         atom_meshes.append(sphere)
+
+        # 🧾 Save metadata
+        atom_data.append({
+            "symbol": atom,
+            "position": [float(p) for p in pos],
+            "radius": float(radius),
+            "color": [float(c) for c in color]
+        })
 
     # ---- BONDS ----
     for bond in mol.GetBonds():
@@ -128,6 +139,7 @@ def rdkit_to_glb(smiles, output_dir=None):
         j = bond.GetEndAtomIdx()
         start = positions[i]
         end = positions[j]
+        bond_order = bond.GetBondTypeAsDouble()
 
         vec = end - start
         length = np.linalg.norm(vec)
@@ -136,8 +148,6 @@ def rdkit_to_glb(smiles, output_dir=None):
 
         direction = vec / length
         z_axis = np.array([0, 0, 1])
-
-        # Compute rotation matrix from z-axis → bond vector
         axis = np.cross(z_axis, direction)
         if np.linalg.norm(axis) < 1e-6:
             rotation = np.eye(4)
@@ -146,8 +156,7 @@ def rdkit_to_glb(smiles, output_dir=None):
             angle = np.arccos(np.dot(z_axis, direction))
             rotation = trimesh.transformations.rotation_matrix(angle, axis)
 
-        # Determine number of cylinders per bond
-        bond_order = bond.GetBondTypeAsDouble()
+        # multiple bonds
         if bond_order == 1:
             offsets = [0.0]
         elif bond_order == 2:
@@ -157,84 +166,46 @@ def rdkit_to_glb(smiles, output_dir=None):
         else:
             offsets = [0.0]
 
-        # Pick an arbitrary perpendicular direction to offset
         perp_dir = np.cross(direction, [1, 0, 0])
         if np.linalg.norm(perp_dir) < 1e-3:
             perp_dir = np.cross(direction, [0, 1, 0])
         perp_dir /= np.linalg.norm(perp_dir)
 
         for offset in offsets:
-            # Create cylinder along +Z (centered)
             cyl = trimesh.creation.cylinder(radius=bond_radius, height=length, sections=16)
             cyl.apply_translation([0, 0, length / 2])
-
-            # Rotate to match bond direction
             cyl.apply_transform(rotation)
-
-            # Offset for multiple bonds
             if offset != 0:
                 cyl.apply_translation(perp_dir * offset)
-
-            # Move to bond start
             cyl.apply_translation(start)
-
-            # Set color (gray bonds)
             cyl.visual.vertex_colors = np.tile([180, 180, 180], (len(cyl.vertices), 1))
             bond_meshes.append(cyl)
-    # for bond in mol.GetBonds():
-    #     i = bond.GetBeginAtomIdx()
-    #     j = bond.GetEndAtomIdx()
-    #     start = positions[i]
-    #     end = positions[j]
 
-    #     # midpoint & vector
-    #     mid = (start + end) / 2
-    #     vec = end - start
-    #     length = np.linalg.norm(vec)
+        # 🔗 Save bond metadata
+        bond_data.append({
+            "start": [float(v) for v in start],
+            "end": [float(v) for v in end],
+            "order": int(bond_order),
+            "length": float(length)
+        })
 
-    #     if length < 1e-6:
-    #         continue  # skip invalid bond
-
-    #     # Normalize bond direction
-    #     direction = vec / length
-    #     z_axis = np.array([0, 0, 1])
-
-    #     # Create cylinder aligned along +Z but starting at origin
-    #     cyl = trimesh.creation.cylinder(radius=0.04, height=length, sections=16)
-    #     cyl.apply_translation([0, 0, length / 2])  # move base to start at (0,0,0)
-
-    #     # Compute rotation from z-axis → bond vector
-    #     axis = np.cross(z_axis, direction)
-    #     if np.linalg.norm(axis) < 1e-6:
-    #         rotation = np.eye(4)
-    #     else:
-    #         axis /= np.linalg.norm(axis)
-    #         angle = np.arccos(np.dot(z_axis, direction))
-    #         rotation = trimesh.transformations.rotation_matrix(angle, axis)
-
-    #     # Rotate then translate to the start atom position
-    #     cyl.apply_transform(rotation)
-    #     cyl.apply_translation(start)
-
-    #     cyl.visual.vertex_colors = np.tile([200, 200, 200], (len(cyl.vertices), 1))
-    #     bond_meshes.append(cyl)
-
-    # Combine all meshes
+    # ---- Combine and Export ----
     combined = trimesh.util.concatenate(atom_meshes + bond_meshes)
 
     os.makedirs(output_dir, exist_ok=True)
-    # Original filename, possibly containing illegal URL characters
     filename = f"{smiles}.glb"
-
-    # Sanitize filename using regex: replace anything that's not alphanumeric, dot, or underscore
     safe_filename = re.sub(r"[^a-zA-Z0-9_.-]", "_", filename)
-
     output_path = os.path.join(output_dir, safe_filename)
 
     combined.export(output_path)
     print("Saving GLB at:", output_path)
-    
-    return output_path
+
+    # 🧾 Return both GLB path and JSON data
+    return {
+        "glb_path": output_path,
+        "atoms": atom_data,
+        "bonds": bond_data
+    }
 
 
 # ----------------------------- Step 3: Dispatcher -----------------------------
@@ -256,9 +227,12 @@ def generate_from_plan(plan: dict) -> str:
 
     elif kind in ("general", "procedural"):
         static_path = os.path.join(settings.STATIC_ROOT, "example.glb")
-        if os.path.exists(static_path):
-            return static_path
-        return os.path.join(settings.BASE_DIR, "static", "example.glb")
+        return {
+            "glb_path": static_path if os.path.exists(static_path)
+                        else os.path.join(settings.BASE_DIR, "static", "example.glb"),
+            "atoms": [],
+            "bonds": []
+        }
 
     else:
         raise ValueError(f"Unknown plan kind: {kind}")

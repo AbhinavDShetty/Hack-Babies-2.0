@@ -436,6 +436,8 @@ class GenerateModelView(APIView):
                             else None,
                             "chat_id": chat_session.id,
                             "reused": True,
+                            "atoms": existing_match.atom_data,
+                            "bonds": existing_match.bond_data
                         },
                         status=status.HTTP_200_OK,
                     )
@@ -445,7 +447,10 @@ class GenerateModelView(APIView):
             plan = parse_prompt_to_plan(prompt, chat_history)
             reasoning = plan.get("reasoning", "")
 
-            file_path = generate_from_plan(plan)
+            model_data = generate_from_plan(plan)
+            atom_data = model_data.get("atoms", [])
+            bond_data = model_data.get("bonds", [])
+            file_path = model_data["glb_path"]
             media_root = str(settings.MEDIA_ROOT)
             rel_path = os.path.relpath(file_path, media_root)
             model_url = f"{settings.MEDIA_URL}{rel_path.replace(os.sep, '/')}"
@@ -466,6 +471,8 @@ class GenerateModelView(APIView):
                 category="custom",
                 thumbnail=rel_thumb_path,
                 model_file=rel_path,
+                atom_data=atom_data,
+                bond_data=bond_data,
             )
 
             # --- Chat session linking ---
@@ -503,6 +510,8 @@ class GenerateModelView(APIView):
                     "response": plan.get("response", ""),
                     "chat_id": chat_session.id,
                     "reused": False,
+                    "atoms": atom_data,
+                    "bonds": bond_data
                 },
                 status=status.HTTP_200_OK,
             )

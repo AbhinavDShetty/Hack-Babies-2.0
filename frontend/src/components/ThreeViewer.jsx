@@ -4,7 +4,7 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 
-export default function ThreeViewer({ modelPath }) {
+export default function ThreeViewer({ modelPath, atomData = [] }) {
   const containerRef = useRef();
 
   useEffect(() => {
@@ -35,12 +35,12 @@ export default function ThreeViewer({ modelPath }) {
     );
     camera.position.set(0, 2, 6);
 
-    // --- Balanced Environment Lighting ---
+    // --- Environment Lighting ---
     const pmremGenerator = new THREE.PMREMGenerator(renderer);
     const envTexture = pmremGenerator.fromScene(new RoomEnvironment(renderer)).texture;
     scene.environment = envTexture;
 
-    // --- Core Lights ---
+    // --- Lights ---
     const superAmbient = new THREE.AmbientLight(0xffffff, 2.8);
     scene.add(superAmbient);
 
@@ -49,7 +49,7 @@ export default function ThreeViewer({ modelPath }) {
       [-5, 5, 5],
       [5, 5, -5],
       [-5, 5, -5],
-      [0, -5, 0], // bottom fill
+      [0, -5, 0],
     ];
     baseDirections.forEach(([x, y, z]) => {
       const light = new THREE.DirectionalLight(0xffffff, 1.0);
@@ -57,7 +57,6 @@ export default function ThreeViewer({ modelPath }) {
       scene.add(light);
     });
 
-    // --- Additional Highlights ---
     const topLight = new THREE.DirectionalLight(0xffffff, 1.3);
     topLight.position.set(0, 8, 0);
     scene.add(topLight);
@@ -83,7 +82,6 @@ export default function ThreeViewer({ modelPath }) {
     controls.target.set(0, 1, 0);
     controls.update();
 
-    // --- Cursor Interaction ---
     const canvas = renderer.domElement;
     canvas.style.cursor = "grab";
     controls.addEventListener("start", () => {
@@ -128,10 +126,8 @@ export default function ThreeViewer({ modelPath }) {
     const clock = new THREE.Clock();
     const animate = () => {
       requestAnimationFrame(animate);
-
       const elapsed = clock.getElapsedTime();
 
-      // resume rotation after 2s idle
       if (!autoRotate && Date.now() - lastInteraction > 2000) {
         autoRotate = true;
       }
@@ -156,11 +152,50 @@ export default function ThreeViewer({ modelPath }) {
     };
   }, [modelPath]);
 
+  // --- Legend Generation ---
+  const uniqueElements = [
+    ...new Map(atomData.map((a) => [a.symbol, a.color])).entries(),
+  ];
+
+  const getContrastColor = (rgbArray) => {
+    const [r, g, b] = rgbArray.map((v) => v * 255);
+    const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+    return brightness > 160 ? "#000" : "#fff";
+  };
+
   return (
     <div
       ref={containerRef}
-      className="w-full h-full rounded-2xl overflow-hidden border border-[rgba(255,255,255,0.12)] 
-                 bg-transparent"
-    />
+      className="relative w-full h-full rounded-2xl overflow-hidden border border-[rgba(255,255,255,0.12)] bg-transparent"
+    >
+      {/* 🧪 Atom Legend */}
+      {uniqueElements.length > 0 && (
+        <div className="absolute top-4 right-4 bg-[rgba(0,0,0,0.6)] text-white rounded-lg px-4 py-3 shadow-lg backdrop-blur-md z-20">
+          <h3 className="text-sm font-semibold mb-2">Atoms</h3>
+          <div className="flex flex-wrap gap-2">
+            {uniqueElements.map(([symbol, colorArr]) => {
+              const bgColor = `rgb(${colorArr
+                .map((v) => Math.round(v * 255))
+                .join(",")})`;
+              const textColor = getContrastColor(colorArr);
+              return (
+                <div
+                  key={symbol}
+                  className="px-3 py-1 rounded-full text-xs font-semibold shadow-md border border-[rgba(255,255,255,0.2)]"
+                  style={{
+                    backgroundColor: bgColor,
+                    color: textColor,
+                    minWidth: "40px",
+                    textAlign: "center",
+                  }}
+                >
+                  {symbol}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
