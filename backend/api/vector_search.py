@@ -1,14 +1,23 @@
 # backend/api/vector_search.py
+
 from sentence_transformers import SentenceTransformer, util
 import torch
-import faiss, numpy as np, json, re, os
+import faiss
+import numpy as np
+import json
+import re
+import os
 import pubchempy as pcp
 from pathlib import Path
 from .llm_client import query_llm
 
-DATA_PATH = Path(__file__).resolve().parent / "geeksforgeeks_chemistry_final.json"
-INDEX_PATH = Path(__file__).resolve().parent / "chemistry_index.faiss"
-DOCS_PATH = Path(__file__).resolve().parent / "chemistry_docs.json"
+# =====================
+# PATHS & MODEL SETUP
+# =====================
+BASE_DIR = Path(__file__).resolve().parent
+DATA_PATH = BASE_DIR / "geeksforgeeks_chemistry_final.json"
+INDEX_PATH = BASE_DIR / "chemistry_index.faiss"
+DOCS_PATH = BASE_DIR / "chemistry_docs.json"
 
 EMBED_MODEL_NAME = os.getenv("EMBED_MODEL", "all-MiniLM-L6-v2")
 _embed_model = SentenceTransformer(EMBED_MODEL_NAME)
@@ -35,12 +44,16 @@ def chunk_text(text, chunk_size=400):
     return chunks
 
 
+# =====================
+# INDEX BUILDING
+# =====================
 def build_index():
     """Build FAISS index from the JSON dataset."""
     global _index, _documents
 
     if not DATA_PATH.exists():
-        print(f"❌ Data file not found: {DATA_PATH}")
+        print(f"⚠️ Data file not found: {DATA_PATH}. Creating empty dataset.")
+        DATA_PATH.write_text("[]", encoding="utf-8")
         return
 
     print(f"📚 Loading dataset from {DATA_PATH.name}...")
@@ -59,6 +72,10 @@ def build_index():
 
     print(f"🧩 Total text chunks: {len(all_texts)}")
 
+    if not all_texts:
+        print("⚠️ No text chunks to build FAISS index. Aborting build.")
+        return
+
     # Build embeddings
     embs = _embed_model.encode(all_texts, convert_to_numpy=True, normalize_embeddings=True)
     d = embs.shape[1]
@@ -74,41 +91,74 @@ def build_index():
     print(f"✅ FAISS index built and saved ({len(_documents)} entries)")
 
 
-def load_index():
-    """Load FAISS index from disk if available."""
+# =====================
+# INDEX LOADING
+# =====================
+def load_index(force_rebuild=False):
+    """
+    Load FAISS index and documents from disk.
+    If missing or forced, rebuilds automatically.
+    """
     global _index, _documents
 
-    if INDEX_PATH.exists() and DOCS_PATH.exists():
+    try:
+        if force_rebuild or not (INDEX_PATH.exists() and DOCS_PATH.exists()):
+            print("🧠 FAISS index missing or rebuild requested — building fresh...")
+            build_index()
+            return True
+
         print(f"⚡ Loading cached FAISS index from disk...")
         _index = faiss.read_index(str(INDEX_PATH))
+
         with open(DOCS_PATH, "r", encoding="utf-8") as f:
             _documents = json.load(f)
-        print(f"✅ Loaded {_index.ntotal} vectors.")
+
+        print(f"✅ Loaded {_index.ntotal} vectors from FAISS index.")
         return True
-    else:
-        print("🧠 Building FAISS index fresh...")
+
+    except Exception as e:
+        print(f"❌ Failed to load FAISS index: {e}")
+        print("🔁 Attempting to rebuild FAISS index...")
         build_index()
         return False
 
 
+# =====================
+# CONTEXT RETRIEVAL
+# =====================
 def retrieve_context(query: str, k: int = 5):
-    """Retrieve top-k relevant text chunks for the query."""
+    """
+    Retrieve top-k relevant text chunks for the query.
+    If the FAISS index isn't loaded or fails, a safe fallback is used.
+    """
+    global _index, _documents
+
     if not _index or not _documents:
         print("⚠️ Index not loaded, calling load_index()...")
         load_index()
 
-    print("Making query embedding and searching in index...")
-    q_emb = _embed_model.encode([query], convert_to_numpy=True, normalize_embeddings=True)
-    D, I = _index.search(np.array(q_emb, dtype="float32"), k)
-    hits = [_documents[idx] for idx in I[0] if 0 <= idx < len(_documents)]
-    return "\n\n".join(hits)
+    if not _index or not _documents:
+        print("🚫 No FAISS index available — returning empty context.")
+        return "No context available. (FAISS index not built yet.)"
+
+    try:
+        print("🔍 Encoding query and searching index...")
+        q_emb = _embed_model.encode([query], convert_to_numpy=True, normalize_embeddings=True)
+        D, I = _index.search(np.array(q_emb, dtype="float32"), k)
+        hits = [_documents[idx] for idx in I[0] if 0 <= idx < len(_documents)]
+        return "\n\n".join(hits) if hits else "No relevant context found."
+    except Exception as e:
+        print(f"❌ FAISS search failed: {e}")
+        return "Error while searching context."
 
 
-# --- PubChem Integration ---
+# =====================
+# PUBCHEM INTEGRATION
+# =====================
 def fetch_molecule_from_pubchem(name: str):
     """Fetch SMILES + IUPAC from PubChem and update local DB."""
     try:
-        results = pcp.get_compounds(name, 'name')
+        results = pcp.get_compounds(name, "name")
         if not results:
             return None
 
@@ -118,30 +168,32 @@ def fetch_molecule_from_pubchem(name: str):
 
         new_entry = {"name": name, "smiles": smiles, "desc": desc}
 
-        # Save locally
+        # Load or create dataset
         docs = []
         if DATA_PATH.exists():
-            with open(DATA_PATH, 'r', encoding='utf-8') as f:
+            with open(DATA_PATH, "r", encoding="utf-8") as f:
                 docs = json.load(f)
         else:
-            DATA_PATH.write_text("[]", encoding='utf-8')
+            DATA_PATH.write_text("[]", encoding="utf-8")
 
         # Avoid duplicates
         if not any(d["name"].lower() == name.lower() for d in docs):
             docs.append(new_entry)
-            with open(DATA_PATH, 'w', encoding='utf-8') as f:
+            with open(DATA_PATH, "w", encoding="utf-8") as f:
                 json.dump(docs, f, indent=2)
             print(f"✅ Added new molecule to database: {name}")
 
         # Rebuild FAISS index
-        build_index([d["desc"] for d in docs])
+        build_index()
         return new_entry
     except Exception as e:
         print(f"❌ PubChem lookup failed for {name}: {e}")
         return None
 
 
-# --- Main LLM + Retrieval Pipeline ---
+# =====================
+# MAIN RETRIEVAL + LLM
+# =====================
 def retrieve_with_reasoning(prompt: str, chat_history: str = "") -> dict:
     """
     Retrieve context and query the LLM to extract SMILES.
@@ -150,7 +202,7 @@ def retrieve_with_reasoning(prompt: str, chat_history: str = "") -> dict:
     context = retrieve_context(prompt)
     llm_prompt = f"""
 You are a chemistry assistant. Based on the following context and user query,
-output a JSON object with keys: 'smiles' , 'title' , 'response' and 'reasoning'.
+output a JSON object with keys: 'smiles', 'title', 'response', and 'reasoning'.
 
 Previous Conversation:
 {chat_history}
@@ -165,7 +217,7 @@ Example:
 {{
     "smiles": "CCO",
     "title": "Ethanol Molecule",
-    "reasoning": "User asked for rubbing alcohol, which is ethanol."
+    "reasoning": "User asked for rubbing alcohol, which is ethanol.",
     "response": "Ethanol is a common molecule used in rubbing alcohol. Here is the 3D model of ethanol."
 }}
 """
@@ -176,9 +228,7 @@ Example:
         print("⚠️ LLM query failed:", e)
         response_text = ""
 
-    smiles = ""
-    reasoning = ""
-    title = ""
+    smiles, reasoning, title = "", "", ""
 
     # Try to parse LLM JSON
     if response_text:
@@ -202,23 +252,18 @@ Example:
             reasoning += f"\n(Fetched from PubChem: {pubchem_data.get('desc')})"
         else:
             reasoning += "\n⚠️ Could not find molecule in PubChem."
-    
+
     response = retrieve_contextual_answer(prompt, chat_history)
 
     return {"smiles": smiles, "reasoning": reasoning, "response": response, "title": title}
 
-#===========================================
 
-# Secondary function for chat-style answers
+# =====================
+# CHAT-STYLE ANSWER
+# =====================
 def retrieve_contextual_answer(prompt: str, chat_history: str = "") -> dict:
-    """
-    Retrieve relevant context from FAISS and query the LLM for a 
-    natural-language explanation (chat-style).
-    Does NOT extract SMILES or model metadata.
-    Returns a dictionary with keys 'answer' and 'title'.
-    """
+    """Retrieve relevant context and query LLM for conversational answer."""
     context = retrieve_context(prompt)
-
     llm_prompt = f"""
 You are a chemistry tutor chatbot.
 Using the context below and your own knowledge,
@@ -236,32 +281,14 @@ User query:
 Guidelines:
 - Be factually accurate and friendly.
 - If you don’t know, say you’re not sure.
-- Do NOT answer questions outside chemistry.
-- If the question is about anything other than chemistry, respond with something like:
-  "I'm here to help with chemistry-related questions. Could you please ask something related to chemistry?"
-- Use simple scientific language.
-- Do NOT generate molecules or SMILES strings.
-
-You are to only provide a conversational answer.
-Return ONLY a JSON object with two keys:
-- "answer": the conversational response text
-- "title": a concise title summarizing the answer
+- Only answer chemistry-related questions.
+Return ONLY JSON with "answer" and "title".
 Example:
-{{
-  "answer": "Water is a compound made of hydrogen and oxygen in a 2:1 ratio.",
-  "title": "Composition of Water"
-}}
-    """
+{{"answer": "Water is made of hydrogen and oxygen.", "title": "Composition of Water"}}
+"""
 
     try:
-        response_text = query_llm(
-            llm_prompt,
-            timeout=120,
-            retries=1,
-            model_name="gpt-oss:20b"
-        ).strip()
-
-        # Find first valid JSON object in response
+        response_text = query_llm(llm_prompt, timeout=120, retries=1, model_name="gpt-oss:20b").strip()
         match = re.search(r"\{.*\}", response_text, re.DOTALL)
         if match:
             parsed = json.loads(match.group(0))
@@ -270,188 +297,76 @@ Example:
                 "title": parsed.get("title", "").strip(),
             }
         else:
-            # Fallback if JSON not returned properly
-            return {
-                "answer": response_text,
-                "title": "",
-            }
-
+            return {"answer": response_text, "title": ""}
     except Exception as e:
         print("⚠️ LLM chat query failed:", e)
-        return {
-            "answer": "⚠️ Sorry, I couldn't retrieve an answer at the moment.",
-            "title": "Error",
-        }
-    
-#===========================================
+        return {"answer": "⚠️ Sorry, I couldn't retrieve an answer at the moment.", "title": "Error"}
 
-# Decide prompt mode with LLM   
+
+# =====================
+# PROMPT CLASSIFICATION
+# =====================
 def classify_prompt_mode(prompt: str, chat_history: str) -> str:
-    """
-    Uses a lightweight LLM classification step to decide whether the user 
-    wants to 'chat' or 'generate' a model.
-    Returns either 'chat' or 'model'.
-    """
-
+    """Classify whether a prompt is for 'chat' or 'model'."""
     llm_prompt = f"""
 You are an intelligent assistant that classifies chemistry-related queries.
-Decide if the user's input is for chatting (asking a question) 
+Decide if the user's input is for chatting (asking a question)
 or generating a molecule/reaction model.
 
-Respond with ONLY one word: "chat" or "model".
-
-If the prompt is not related to chemistry or is unclear, respond with "invalid".
-
-Examples:
-- "Explain the structure of DNA" → chat
-- "Generate a 3D model of caffeine" → model
-- "What is the molecular weight of water?" → chat
-- "Make a molecule for glucose" → model
-- "Tell me about the properties of ethanol" → chat
-
-Previous Conversation:
-{chat_history}
-
-User input:
-{prompt}
+Respond with ONLY: "chat", "model", or "invalid".
 """
-
     try:
-        response = query_llm(llm_prompt, timeout=60, retries=1, model_name="llama3:8b").strip().lower()
+        response = query_llm(llm_prompt, timeout=300, retries=1, model_name="llama3:8b").strip().lower()
         if "model" in response:
             return "model"
         if "chat" in response:
             return "chat"
         return "invalid"
     except Exception as e:
-        print("⚠️ Failed to classify prompt: (setting default mode as chat)", e)
-        # Default to chat to avoid unnecessary model generation
+        print("⚠️ Failed to classify prompt:", e)
         return "chat"
 
 
-# ===========================================
-# Response Validation Function
-
-# def validate_llm_response(prompt: str, response: str, context: str = "", chat_history: str = "") -> str:
-#     """
-#     Validates an LLM's response based on chemistry accuracy, context relevance,
-#     and logical consistency using a lightweight critic model (llama3:8b).
-
-#     Returns:
-#         "valid" or "invalid"
-#     """
-
-#     validation_prompt = f"""
-# You are an expert chemistry validator AI.
-# Your job is to judge whether the assistant's response is factually correct,
-# scientifically reasonable, and relevant to the given user query.
-
-# Use the context and conversation provided, but base your judgment on logic and accuracy.
-
-# Previous Conversation:
-# {chat_history}
-
-# Relevant Context:
-# {context}
-
-# User Query:
-# {prompt}
-
-# Assistant Response:
-# {response}
-
-# Rules:
-# - If the response is factually correct, relevant, and clearly answers the question → respond with "valid".
-# - If the response includes incorrect, misleading, off-topic, or nonsensical information → respond with "invalid".
-# - Do not include explanations or any text other than one word.
-
-# Answer strictly with one of these two words:
-# valid
-# invalid
-# """
-
-#     try:
-#         judgment = query_llm(validation_prompt, timeout=60, retries=1, model_name="llama3:8b").strip().lower()
-#         return "valid" if "valid" in judgment else "invalid"
-#     except Exception as e:
-#         print("⚠️ Response validation failed:", e)
-#         return "invalid"
-
-
-#==========================================
-# Hybrid Model Existence Check
+# =====================
+# MODEL EXISTENCE CHECK
+# =====================
 def check_existing_model_with_llm(prompt: str, all_models: list) -> dict:
     """
     Hybrid method:
-    1. Use MiniLM to find top-k semantically similar models.
-    2. Ask GPT-OSS-20B to verify if one matches the requested prompt.
-    Returns:
-        {
-          "exists": bool,
-          "name": str or None,
-          "model_file": str or None,
-          "response": str
-        }
+    1. Use MiniLM for top-k semantic similarity.
+    2. Ask LLM to confirm closest match.
     """
-
-    # If there are no models, skip check
     if not all_models:
         return {"exists": False, "name": None, "model_file": None, "response": ""}
 
-    # Convert queryset to list so we can index freely
     all_models = list(all_models)
-
-    # Step 1 — Encode all models
     texts = [f"{m.name}. {m.description or ''}" for m in all_models]
     model_embs = _embed_model.encode(texts, convert_to_tensor=True, normalize_embeddings=True)
     query_emb = _embed_model.encode(prompt, convert_to_tensor=True, normalize_embeddings=True)
 
-    # Step 2 — Find top-3 semantic matches
     cos_scores = util.cos_sim(query_emb, model_embs)[0]
     top_k = min(3, len(all_models))
-    top_results = torch.topk(cos_scores, k=top_k)
-    top_indices = top_results[1].cpu().tolist()  # ✅ convert to normal Python list
-
+    top_indices = torch.topk(cos_scores, k=top_k)[1].cpu().tolist()
     candidate_models = [all_models[i] for i in top_indices]
 
-    # Step 3 — Prepare compact summaries for LLM
     model_summaries = "\n".join(
         [f"- {m.name}: {m.description[:200]} (file: {m.model_file.url if m.model_file else 'N/A'})"
          for m in candidate_models]
     )
 
     llm_prompt = f"""
-You are a chemistry assistant responsible for retrieving stored molecule models.
-
-Here are some candidate models that may match the user's request:
+You are a chemistry assistant verifying if stored molecule models match a user's request.
+Candidate models:
 {model_summaries}
 
-The user asked:
+User request:
 "{prompt}"
 
-Your task:
-1. Decide if the user's request matches any of the models.
-2. If yes, return a JSON object like:
-{{
-  "exists": true,
-  "name": "Water Molecule",
-  "model_file": "models/water.glb",
-  "response": "Found this model in stored templates: Water Molecule."
-}}
-3. If no match, return:
-{{
-  "exists": false,
-  "name": null,
-  "model_file": null,
-  "response": "No matching model found."
-}}
-
-Respond ONLY with valid JSON and nothing else.
-"""
+Respond in JSON:
+{{"exists": true/false, "name": "...", "model_file": "...", "response": "..."}}"""
 
     try:
         result_text = query_llm(llm_prompt, timeout=120, retries=1, model_name="gpt-oss:20b")
-
         match = re.search(r"\{.*\}", result_text, re.DOTALL)
         if match:
             parsed = json.loads(match.group(0))
@@ -461,8 +376,7 @@ Respond ONLY with valid JSON and nothing else.
                 "response": parsed.get("response", ""),
                 "model_file": parsed.get("model_file"),
             }
-        else:
-            return {"exists": False, "name": None, "model_file": None, "response": ""}
+        return {"exists": False, "name": None, "model_file": None, "response": ""}
     except Exception as e:
         print("⚠️ check_existing_model_with_llm failed:", e)
         return {"exists": False, "name": None, "model_file": None, "response": ""}

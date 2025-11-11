@@ -3,9 +3,10 @@ import os
 import time
 import requests
 
-OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434/api/generate")
+OLLAMA_URL = "http://localhost:11434/api/generate"
+
 # preferred model; set via env if you want to change without code
-MODEL_NAME = os.getenv("OLLAMA_MODEL", "gpt-oss:20b")
+MODEL_NAME = "gpt-oss:20b"
 
 
 def query_llm(prompt: str, timeout=180, retries=2, backoff=2, model_name: str = MODEL_NAME) -> str:
