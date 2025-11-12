@@ -255,3 +255,47 @@ body, html, #root {
   scrollbar-width: none; /* Firefox */
   -ms-overflow-style: none; /* IE/Edge */
 }
+
+/* react-split gutter styling */
+.gutter {
+  background-color: rgba(255, 255, 255, 0.02);
+  transition: background-color 0.15s ease, box-shadow 0.15s ease;
+  width: 8px; /* horizontal gutter width */
+  cursor: col-resize;
+  z-index: 40;
+}
+.gutter:hover {
+  background-color: rgba(99, 102, 241, 0.12);
+  box-shadow: 0 0 8px rgba(99,102,241,0.08);
+}
+
+/* make sure left collapsed slim column is clickable */
+.minimized-column {
+  width: 8px;
+  min-width: 8px;
+  max-width: 12px;
+}
+
+.custom-scrollbar {
+  scrollbar-width: thin;             /* Firefox */
+  scrollbar-color: #555 rgba(255, 255, 255, 0.05);
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: #666;
+  border-radius: 10px;
+  border: 2px solid rgba(255, 255, 255, 0.05);
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: #888;
+}

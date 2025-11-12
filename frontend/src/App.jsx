@@ -1,6 +1,5 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
-import Header from "./components/Header";
 import Sidebar from "./components/Sidebar";
 import InputBar from "./components/InputBar";
 import ChatBox from "./components/ChatBox";
@@ -8,6 +7,9 @@ import ThreeViewer from "./components/ThreeViewer";
 import HomeGrid from "./components/HomeGrid";
 import BackButton from "./components/BackButton";
 import Landing3D from "./components/Landing3D";
+import Header from "./components/Header";
+import Split from "react-split";
+import { ChevronRight, X } from "lucide-react";
 import "./App.css";
 
 function App() {
@@ -27,20 +29,46 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [viewerCollapsed, setViewerCollapsed] = useState(false);
   const userId = 1;
+
+  // Split layout sizing
+  const [sizes, setSizes] = useState(() => (viewerCollapsed ? [8, 92] : [60, 40]));
+  const lastOpenSizesRef = useRef([60, 40]);
 
   useEffect(() => {
     localStorage.setItem("appMode", mode);
     if (modelUrl) localStorage.setItem("modelUrl", modelUrl);
   }, [mode, modelUrl]);
 
+  // Sync collapse state with split sizes
   useEffect(() => {
-    const savedModel = localStorage.getItem("modelUrl");
-    if ((mode === "chat" || mode === "model") && !chatId && !savedModel) {
-      setMode("home");
+    if (viewerCollapsed) {
+      setSizes([8, 92]);
+    } else {
+      setSizes(lastOpenSizesRef.current || [60, 40]);
+      setTimeout(() => window.dispatchEvent(new Event("resize")), 200);
     }
-  }, []);
+  }, [viewerCollapsed]);
 
+  const onDragEnd = (newSizes) => {
+    setSizes(newSizes);
+    if (!viewerCollapsed && newSizes[0] > 8) {
+      lastOpenSizesRef.current = newSizes;
+    }
+  };
+
+  const onDrag = (newSizes) => {
+    if (viewerCollapsed && newSizes[0] > 10) {
+      setViewerCollapsed(false);
+      lastOpenSizesRef.current = newSizes;
+      setSizes(newSizes);
+    } else {
+      setSizes(newSizes);
+    }
+  };
+
+  // --- Backend handling ---
   const loadChatFromBackend = async (id) => {
     try {
       const res = await fetch(`http://127.0.0.1:8000/api/chat/${id}/`);
@@ -89,24 +117,35 @@ function App() {
       const data = await res.json();
 
       if (["invalid", "chat"].includes(data.mode)) {
-        setMode("chat");
+        if (mode !== "model") setMode("chat");
         setChatHistory((prev) => [...prev, { sender: "bot", text: data.response }]);
-        if (data.chat_id) {
-          setChatId(data.chat_id);
-          setRefreshTrigger((r) => r + 1);
-        }
+        if (data.chat_id) setChatId(data.chat_id);
       } else if (data.mode === "model") {
-        const newModels = data.models || [];
-        const newModel = newModels[newModels.length - 1];
-        const modelPath = "http://127.0.0.1:8000" + newModel.modelUrl;
+        if (data.models?.length) {
+          const newModels = data.models;
+          const newModel = newModels[newModels.length - 1];
+          const modelPath = "http://127.0.0.1:8000" + newModel.modelUrl;
 
-        setMode("model");
-        setModelUrl(modelPath);
-        setChatId(data.chat_id || chatId);
-        setActiveModels(newModels);
-        setCurrentModelIndex(newModels.length - 1);
+          setMode("model");
+          setModelUrl(modelPath);
+          setChatId(data.chat_id || chatId);
+          setActiveModels(newModels);
+          setCurrentModelIndex(newModels.length - 1);
+        } else if (data.model_url) {
+          const singleModel = {
+            modelUrl: data.model_url,
+            thumbnail: data.thumbnail,
+            name: data.title || "Generated Model",
+            atom_data: data.atoms || [],
+          };
+          setMode("model");
+          setModelUrl("http://127.0.0.1:8000" + data.model_url);
+          setChatId(data.chat_id || chatId);
+          setActiveModels((prev) => [...prev, singleModel]);
+          setCurrentModelIndex((prev) => prev + 1);
+        }
         setChatHistory((prev) => [...prev, { sender: "bot", text: data.response }]);
-        setRefreshTrigger((r) => r + 1);
+        setViewerCollapsed(false);
       }
     } catch (err) {
       console.error("❌ Backend error:", err);
@@ -123,6 +162,7 @@ function App() {
   const handleSelectSession = (session) => {
     setChatId(session.id);
     loadChatFromBackend(session.id);
+    setSidebarOpen(false);
   };
 
   const handleTemplateSelect = async (item) => {
@@ -146,7 +186,6 @@ function App() {
     } catch {
       console.warn("⚠️ No existing chat for model, starting new one.");
     }
-
     setChatHistory([{ sender: "bot", text: item.description }]);
   };
 
@@ -154,8 +193,7 @@ function App() {
     if (currentModelIndex < activeModels.length - 1) {
       const nextIndex = currentModelIndex + 1;
       setCurrentModelIndex(nextIndex);
-      const nextModel = activeModels[nextIndex];
-      setModelUrl("http://127.0.0.1:8000" + nextModel.modelUrl);
+      setModelUrl("http://127.0.0.1:8000" + activeModels[nextIndex].modelUrl);
     }
   };
 
@@ -163,8 +201,7 @@ function App() {
     if (currentModelIndex > 0) {
       const prevIndex = currentModelIndex - 1;
       setCurrentModelIndex(prevIndex);
-      const prevModel = activeModels[prevIndex];
-      setModelUrl("http://127.0.0.1:8000" + prevModel.modelUrl);
+      setModelUrl("http://127.0.0.1:8000" + activeModels[prevIndex].modelUrl);
     }
   };
 
@@ -175,19 +212,7 @@ function App() {
     setChatHistory([]);
     setActiveModels([]);
     localStorage.removeItem("modelUrl");
-    localStorage.setItem("appMode", "home");
   };
-
-  useEffect(() => {
-    const handleKey = (e) => {
-      if (mode === "model") {
-        if (e.key === "ArrowRight") handleNextModel();
-        if (e.key === "ArrowLeft") handlePrevModel();
-      }
-    };
-    window.addEventListener("keydown", handleKey);
-    return () => window.removeEventListener("keydown", handleKey);
-  }, [mode, currentModelIndex, activeModels]);
 
   const currentAtomData = activeModels[currentModelIndex]?.atom_data || [];
 
@@ -195,19 +220,16 @@ function App() {
     <>
       <Sidebar
         isOpen={sidebarOpen}
+        setIsOpen={setSidebarOpen}
         onSelectSession={handleSelectSession}
         userId={userId}
         refreshTrigger={refreshTrigger}
       />
+      <div className="meku-theme app-container">
+        <Header />
+        {(mode === "chat" || mode === "model") && <BackButton onClick={handleBackToHome} />}
 
-      <div className={`meku-theme app-container ${sidebarOpen ? "sidebar-open" : ""}`}>
-        <Header onSidebarToggle={() => setSidebarOpen(!sidebarOpen)} />
-
-        {(mode === "chat" || mode === "model") && (
-          <BackButton onClick={handleBackToHome} />
-        )}
-
-        {/* 🏠 HOME MODE */}
+        {/* HOME MODE */}
         {mode === "home" && (
           <>
             <Landing3D />
@@ -215,139 +237,127 @@ function App() {
               <HomeGrid onSelectModel={handleTemplateSelect} userId={userId} />
             </div>
             <div className="fixed bottom-8 left-1/2 -translate-x-1/2 w-[80%] max-w-[700px] px-4">
-              <InputBar
-                prompt={prompt}
-                setPrompt={setPrompt}
-                handleSubmit={handleSubmit}
-                loading={loading}
-                mode={mode}
-              />
+              <InputBar prompt={prompt} setPrompt={setPrompt} handleSubmit={handleSubmit} loading={loading} mode={mode} />
             </div>
           </>
         )}
 
-        {/* 💬 CHAT MODE */}
-        {mode === "chat" && (
-          <>
-            <motion.div
-              className="chat-mode"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-            >
-              <div className="w-250 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.15)] rounded-2xl overflow-hidden backdrop-blur-md shadow-[0_0_40px_rgba(99,102,241,0.15)]">
-                <ChatBox messages={chatHistory} />
-              </div>
-            </motion.div>
-
-            <div className="fixed bottom-8 left-1/2 -translate-x-1/2 w-300 max-w-[700px] px-4">
-              <InputBar
-                prompt={prompt}
-                setPrompt={setPrompt}
-                handleSubmit={handleSubmit}
-                loading={loading}
-                mode={mode}
-              />
-            </div>
-          </>
-        )}
-
-        {/* 🧬 MODEL MODE */}
+        {/* MODEL MODE */}
         {mode === "model" && (
           <motion.div
-            className="model-chat-layout px-6 gap-6 relative"
+            className="model-chat-layout relative h-[calc(100vh-4rem)] px-4"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
           >
-            {/* --- LEFT COLUMN (3D Viewer + Carousel) --- */}
-            <div className="flex flex-col flex-[0.6]">
-              {/* 3D Viewer Box */}
-              <div className="relative h-full rounded-2xl overflow-hidden border border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.05)] shadow-[0_0_30px_rgba(99,102,241,0.2)]">
-                {activeModels.length > 0 && (
-                  <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-[rgba(0,0,0,0.65)] px-5 py-2 rounded-full text-sm text-white shadow-md backdrop-blur-md z-20">
-                    {activeModels[currentModelIndex]?.name || "Model"}
-                    <span className="ml-2 text-gray-400 text-xs">
-                      ({currentModelIndex + 1}/{activeModels.length})
-                    </span>
+            <Split
+              className="flex h-full w-full"
+              sizes={sizes}
+              minSize={[8, 300]}
+              gutterSize={8}
+              snapOffset={10}
+              expandToMin={true}
+              onDrag={onDrag}
+              onDragEnd={onDragEnd}
+            >
+              {/* LEFT: Viewer */}
+              <div className="relative flex flex-col transition-all duration-300 ease-in-out overflow-hidden">
+                {viewerCollapsed ? (
+                  <div className="absolute top-2 left-1/2 -translate-x-1/2 z-30">
+                    <button
+                      onClick={() => setViewerCollapsed(false)}
+                      className="bg-[rgba(255,255,255,0.12)] hover:bg-[rgba(255,255,255,0.25)] text-white rounded-full w-7 h-7 flex items-center justify-center transition-all"
+                    >
+                      <ChevronRight size={16} />
+                    </button>
                   </div>
-                )}
+                ) : (
+                  <>
+                    {/* Collapse button */}
+                    <div className="absolute top-2 left-2 z-20">
+                      <button
+                        onClick={() => setViewerCollapsed(true)}
+                        className="bg-[rgba(255,255,255,0.08)] hover:bg-[rgba(255,255,255,0.2)] text-white rounded-full w-8 h-8 flex items-center justify-center shadow-md"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
 
-                {modelUrl && (
-                  <motion.div
-                    key={`${modelUrl}-${currentModelIndex}`}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.3 }}
-                    className="w-full h-full"
-                  >
-                    <ThreeViewer
-                      key={`${modelUrl}-${currentModelIndex}`}
-                      modelPath={modelUrl}
-                      atomData={currentAtomData}
-                    />
-                  </motion.div>
+                    {/* Title */}
+                    {activeModels.length > 0 && (
+                      <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-[rgba(0,0,0,0.65)] px-5 py-2 rounded-full text-sm text-white shadow-md backdrop-blur-md z-10">
+                        {activeModels[currentModelIndex]?.name || "Model"}
+                        <span className="ml-2 text-gray-400 text-xs">
+                          ({currentModelIndex + 1}/{activeModels.length})
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Viewer */}
+                    <div className="flex-1 w-full h-full">
+                      {modelUrl && (
+                        <ThreeViewer
+                          key={`${modelUrl}-${currentModelIndex}-${viewerCollapsed ? "closed" : "open"}`}
+                          modelPath={modelUrl}
+                          atomData={currentAtomData}
+                        />
+                      )}
+                    </div>
+
+                    {/* Carousel */}
+                    {activeModels.length > 0 && (
+                      <div className="absolute bottom-0 w-full flex items-center justify-center mt-3 py-3 rounded-xl bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.08)] backdrop-blur-md shadow-[0_0_20px_rgba(99,102,241,0.1)]">
+                        {currentModelIndex > 0 && (
+                          <button
+                            onClick={handlePrevModel}
+                            className="absolute left-4 bg-[rgba(255,255,255,0.1)] hover:bg-[rgba(255,255,255,0.25)] text-white rounded-full w-9 h-9 flex items-center justify-center text-lg shadow-lg backdrop-blur-md transition-all"
+                          >
+                            ←
+                          </button>
+                        )}
+
+                        <div className="flex gap-2 overflow-x-auto px-12 custom-scroll">
+                          {activeModels.map((m, idx) => (
+                            <img
+                              key={idx}
+                              src={`http://127.0.0.1:8000${m.thumbnail}`}
+                              alt={m.name}
+                              onClick={() => {
+                                setCurrentModelIndex(idx);
+                                setModelUrl("http://127.0.0.1:8000" + m.modelUrl);
+                              }}
+                              className={`w-14 h-14 rounded-lg object-cover cursor-pointer border-2 transition-all ${
+                                idx === currentModelIndex
+                                  ? "border-blue-400 scale-105"
+                                  : "border-transparent opacity-80 hover:opacity-100"
+                              }`}
+                            />
+                          ))}
+                        </div>
+
+                        {currentModelIndex < activeModels.length - 1 && (
+                          <button
+                            onClick={handleNextModel}
+                            className="absolute right-4 bg-[rgba(255,255,255,0.1)] hover:bg-[rgba(255,255,255,0.25)] text-white rounded-full w-9 h-9 flex items-center justify-center text-lg shadow-lg backdrop-blur-md transition-all"
+                          >
+                            →
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
 
-              {/* --- Carousel BELOW Viewer --- */}
-              {activeModels.length > 0 && (
-                <div className="relative flex items-center justify-center mt-4 py-3 rounded-xl bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.08)] backdrop-blur-md shadow-[0_0_20px_rgba(99,102,241,0.1)]">
-                  {/* ← Left Arrow */}
-                  {currentModelIndex > 0 && (
-                    <button
-                      onClick={handlePrevModel}
-                      className="absolute left-4 bg-[rgba(255,255,255,0.1)] hover:bg-[rgba(255,255,255,0.25)] text-white rounded-full w-9 h-9 flex items-center justify-center text-lg shadow-lg backdrop-blur-md transition-all"
-                    >
-                      ←
-                    </button>
-                  )}
-
-                  {/* Thumbnails */}
-                  <div className="flex gap-2 overflow-x-auto px-12 custom-scroll">
-                    {activeModels.map((m, idx) => (
-                      <img
-                        key={idx}
-                        src={`http://127.0.0.1:8000${m.thumbnail}`}
-                        alt={m.name}
-                        onClick={() => {
-                          setCurrentModelIndex(idx);
-                          setModelUrl("http://127.0.0.1:8000" + m.modelUrl);
-                        }}
-                        className={`w-14 h-14 rounded-lg object-cover cursor-pointer border-2 transition-all ${idx === currentModelIndex
-                            ? "border-blue-400 scale-105"
-                            : "border-transparent opacity-80 hover:opacity-100"
-                          }`}
-                      />
-                    ))}
-                  </div>
-
-                  {/* → Right Arrow */}
-                  {currentModelIndex < activeModels.length - 1 && (
-                    <button
-                      onClick={handleNextModel}
-                      className="absolute right-4 bg-[rgba(255,255,255,0.1)] hover:bg-[rgba(255,255,255,0.25)] text-white rounded-full w-9 h-9 flex items-center justify-center text-lg shadow-lg backdrop-blur-md transition-all"
-                    >
-                      →
-                    </button>
-                  )}
+              {/* RIGHT: Chat */}
+              <div className="relative flex flex-col h-full overflow-hidden">
+                <div className="flex-1 overflow-y-auto p-4 chat-box bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.15)] rounded-2xl shadow-[0_0_40px_rgba(99,102,241,0.15)]">
+                  <ChatBox messages={chatHistory} />
                 </div>
-              )}
-            </div>
-
-            {/* --- RIGHT COLUMN (Chat) --- */}
-            <div className="flex-[0.4] flex flex-col h-full bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.15)] rounded-2xl shadow-[0_0_40px_rgba(99,102,241,0.15)]">
-              <div className="flex-1 overflow-y-auto p-4 chat-box">
-                <ChatBox messages={chatHistory} />
+                <div className="p-3 border-t border-[rgba(255,255,255,0.15)]">
+                  <InputBar prompt={prompt} setPrompt={setPrompt} handleSubmit={handleSubmit} loading={loading} mode={mode} />
+                </div>
               </div>
-              <div className="p-3 border-t border-[rgba(255,255,255,0.15)]">
-                <InputBar
-                  prompt={prompt}
-                  setPrompt={setPrompt}
-                  handleSubmit={handleSubmit}
-                  loading={loading}
-                  mode={mode}
-                />
-              </div>
-            </div>
+            </Split>
           </motion.div>
         )}
       </div>

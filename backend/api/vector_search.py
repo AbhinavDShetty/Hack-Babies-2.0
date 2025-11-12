@@ -205,7 +205,7 @@ Example:
     
     response = retrieve_contextual_answer(prompt, chat_history)
 
-    return {"smiles": smiles, "reasoning": reasoning, "response": response, "title": title}
+    return {"smiles": smiles, "reasoning": reasoning, "response": response.get("answer", response), "title": title}
 
 #===========================================
 
