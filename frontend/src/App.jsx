@@ -35,6 +35,7 @@ function App() {
   // Split layout sizing
   const [sizes, setSizes] = useState(() => (viewerCollapsed ? [8, 92] : [60, 40]));
   const lastOpenSizesRef = useRef([60, 40]);
+  const containerRef = useRef(null);
 
   useEffect(() => {
     localStorage.setItem("appMode", mode);
@@ -51,20 +52,37 @@ function App() {
     }
   }, [viewerCollapsed]);
 
-  const onDragEnd = (newSizes) => {
-    setSizes(newSizes);
-    if (!viewerCollapsed && newSizes[0] > 8) {
+  // Auto collapse/expand detection based on actual px width
+  const checkCollapseState = (newSizes) => {
+    if (!containerRef.current) return;
+    const totalWidth = containerRef.current.offsetWidth;
+    const leftWidthPx = (totalWidth * newSizes[0]) / 100;
+
+    // Collapse threshold < 50px
+    if (!viewerCollapsed && leftWidthPx < 50) {
+      setViewerCollapsed(true);
+      setSizes([8, 92]);
+      return;
+    }
+
+    // Expand threshold > 50px
+    if (viewerCollapsed && leftWidthPx > 50) {
+      setViewerCollapsed(false);
       lastOpenSizesRef.current = newSizes;
+      setSizes(newSizes);
+      return;
     }
   };
 
   const onDrag = (newSizes) => {
-    if (viewerCollapsed && newSizes[0] > 10) {
-      setViewerCollapsed(false);
+    setSizes(newSizes);
+    checkCollapseState(newSizes);
+  };
+
+  const onDragEnd = (newSizes) => {
+    checkCollapseState(newSizes);
+    if (!viewerCollapsed && newSizes[0] > 8) {
       lastOpenSizesRef.current = newSizes;
-      setSizes(newSizes);
-    } else {
-      setSizes(newSizes);
     }
   };
 
@@ -189,31 +207,6 @@ function App() {
     setChatHistory([{ sender: "bot", text: item.description }]);
   };
 
-  const handleNextModel = () => {
-    if (currentModelIndex < activeModels.length - 1) {
-      const nextIndex = currentModelIndex + 1;
-      setCurrentModelIndex(nextIndex);
-      setModelUrl("http://127.0.0.1:8000" + activeModels[nextIndex].modelUrl);
-    }
-  };
-
-  const handlePrevModel = () => {
-    if (currentModelIndex > 0) {
-      const prevIndex = currentModelIndex - 1;
-      setCurrentModelIndex(prevIndex);
-      setModelUrl("http://127.0.0.1:8000" + activeModels[prevIndex].modelUrl);
-    }
-  };
-
-  const handleBackToHome = () => {
-    setMode("home");
-    setModelUrl(null);
-    setChatId(null);
-    setChatHistory([]);
-    setActiveModels([]);
-    localStorage.removeItem("modelUrl");
-  };
-
   const currentAtomData = activeModels[currentModelIndex]?.atom_data || [];
 
   return (
@@ -225,9 +218,9 @@ function App() {
         userId={userId}
         refreshTrigger={refreshTrigger}
       />
-      <div className="meku-theme app-container">
+      <div className="meku-theme app-container" ref={containerRef}>
         <Header />
-        {(mode === "chat" || mode === "model") && <BackButton onClick={handleBackToHome} />}
+        {(mode === "chat" || mode === "model") && <BackButton onClick={() => setMode("home")} />}
 
         {/* HOME MODE */}
         {mode === "home" && (
@@ -235,9 +228,6 @@ function App() {
             <Landing3D />
             <div id="home-grid" style={{ scrollMarginTop: "100vh" }}>
               <HomeGrid onSelectModel={handleTemplateSelect} userId={userId} />
-            </div>
-            <div className="fixed bottom-8 left-1/2 -translate-x-1/2 w-[80%] max-w-[700px] px-4">
-              <InputBar prompt={prompt} setPrompt={setPrompt} handleSubmit={handleSubmit} loading={loading} mode={mode} />
             </div>
           </>
         )}
@@ -286,9 +276,6 @@ function App() {
                     {activeModels.length > 0 && (
                       <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-[rgba(0,0,0,0.65)] px-5 py-2 rounded-full text-sm text-white shadow-md backdrop-blur-md z-10">
                         {activeModels[currentModelIndex]?.name || "Model"}
-                        <span className="ml-2 text-gray-400 text-xs">
-                          ({currentModelIndex + 1}/{activeModels.length})
-                        </span>
                       </div>
                     )}
 
@@ -296,7 +283,7 @@ function App() {
                     <div className="flex-1 w-full h-full">
                       {modelUrl && (
                         <ThreeViewer
-                          key={`${modelUrl}-${currentModelIndex}-${viewerCollapsed ? "closed" : "open"}`}
+                          key={`${modelUrl}-${viewerCollapsed}`}
                           modelPath={modelUrl}
                           atomData={currentAtomData}
                         />
@@ -305,43 +292,23 @@ function App() {
 
                     {/* Carousel */}
                     {activeModels.length > 0 && (
-                      <div className="absolute bottom-0 w-full flex items-center justify-center mt-3 py-3 rounded-xl bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.08)] backdrop-blur-md shadow-[0_0_20px_rgba(99,102,241,0.1)]">
-                        {currentModelIndex > 0 && (
-                          <button
-                            onClick={handlePrevModel}
-                            className="absolute left-4 bg-[rgba(255,255,255,0.1)] hover:bg-[rgba(255,255,255,0.25)] text-white rounded-full w-9 h-9 flex items-center justify-center text-lg shadow-lg backdrop-blur-md transition-all"
-                          >
-                            ←
-                          </button>
-                        )}
-
-                        <div className="flex gap-2 overflow-x-auto px-12 custom-scroll">
-                          {activeModels.map((m, idx) => (
-                            <img
-                              key={idx}
-                              src={`http://127.0.0.1:8000${m.thumbnail}`}
-                              alt={m.name}
-                              onClick={() => {
-                                setCurrentModelIndex(idx);
-                                setModelUrl("http://127.0.0.1:8000" + m.modelUrl);
-                              }}
-                              className={`w-14 h-14 rounded-lg object-cover cursor-pointer border-2 transition-all ${
-                                idx === currentModelIndex
-                                  ? "border-blue-400 scale-105"
-                                  : "border-transparent opacity-80 hover:opacity-100"
-                              }`}
-                            />
-                          ))}
-                        </div>
-
-                        {currentModelIndex < activeModels.length - 1 && (
-                          <button
-                            onClick={handleNextModel}
-                            className="absolute right-4 bg-[rgba(255,255,255,0.1)] hover:bg-[rgba(255,255,255,0.25)] text-white rounded-full w-9 h-9 flex items-center justify-center text-lg shadow-lg backdrop-blur-md transition-all"
-                          >
-                            →
-                          </button>
-                        )}
+                      <div className="absolute bottom-0 w-full flex items-center justify-center mt-3 py-3 rounded-xl bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.08)] backdrop-blur-md">
+                        {activeModels.map((m, idx) => (
+                          <img
+                            key={idx}
+                            src={`http://127.0.0.1:8000${m.thumbnail}`}
+                            alt={m.name}
+                            onClick={() => {
+                              setCurrentModelIndex(idx);
+                              setModelUrl("http://127.0.0.1:8000" + m.modelUrl);
+                            }}
+                            className={`w-14 h-14 rounded-lg object-cover cursor-pointer border-2 transition-all ${
+                              idx === currentModelIndex
+                                ? "border-blue-400 scale-105"
+                                : "border-transparent opacity-80 hover:opacity-100"
+                            }`}
+                          />
+                        ))}
                       </div>
                     )}
                   </>
@@ -349,12 +316,18 @@ function App() {
               </div>
 
               {/* RIGHT: Chat */}
-              <div className="relative flex flex-col h-full overflow-hidden">
-                <div className="flex-1 overflow-y-auto p-4 chat-box bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.15)] rounded-2xl shadow-[0_0_40px_rgba(99,102,241,0.15)]">
+              <div className="relative flex flex-col h-full overflow-hidden flex-1 min-w-0">
+                <div className="flex-1 overflow-y-auto p-4 chat-box bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.15)] rounded-2xl">
                   <ChatBox messages={chatHistory} />
                 </div>
                 <div className="p-3 border-t border-[rgba(255,255,255,0.15)]">
-                  <InputBar prompt={prompt} setPrompt={setPrompt} handleSubmit={handleSubmit} loading={loading} mode={mode} />
+                  <InputBar
+                    prompt={prompt}
+                    setPrompt={setPrompt}
+                    handleSubmit={handleSubmit}
+                    loading={loading}
+                    mode={mode}
+                  />
                 </div>
               </div>
             </Split>

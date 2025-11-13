@@ -58,9 +58,9 @@ export default function Sidebar({
           initial={{ x: -60, opacity: 0 }}
           animate={{ x: 0, opacity: 1 }}
           transition={{ duration: 0.3 }}
-          className="fixed top-5 left-5 z-50 bg-[rgba(99,102,241,0.9)] hover:bg-[rgba(99,102,241,1)] text-white p-3 rounded-full shadow-lg backdrop-blur-md"
+          className="fixed top-4 left-5 z-50 text-white p-3 rounded-full shadow-lg backdrop-blur-md hover:cursor-pointer hover:text-slate-300"
         >
-          <Menu size={20} />
+          <Menu size={25} />
         </motion.button>
       )}
 
