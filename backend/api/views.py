@@ -320,7 +320,7 @@ class GenerateModelView(APIView):
             print("\n==============================")
             print(f"🚀 Received prompt: {prompt}")
             print("==============================")
-            print("Classifying prompt mode... (with chat history):\n", chat_history)
+            print("Classifying prompt mode... (with chat history)\n")
 
             # --- Step 1: Determine mode (chat/model/invalid) ---
             mode = classify_prompt_mode(prompt, chat_history)

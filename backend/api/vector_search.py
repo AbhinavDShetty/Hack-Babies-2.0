@@ -10,14 +10,21 @@ import os
 import pubchempy as pcp
 from pathlib import Path
 from .llm_client import query_llm
+import tempfile
 
 # =====================
 # PATHS & MODEL SETUP
 # =====================
 BASE_DIR = Path(__file__).resolve().parent
 DATA_PATH = BASE_DIR / "geeksforgeeks_chemistry_final.json"
-INDEX_PATH = BASE_DIR / "chemistry_index.faiss"
-DOCS_PATH = BASE_DIR / "chemistry_docs.json"
+
+safe_dir = Path(tempfile.gettempdir()) / "hackbabies_index"
+safe_dir.mkdir(exist_ok=True)
+
+INDEX_PATH = safe_dir / "chemistry_index.faiss"
+DOCS_PATH = safe_dir / "chemistry_docs.json"
+
+print(f"🔒 Using FAISS-safe path: {INDEX_PATH}")
 
 EMBED_MODEL_NAME = os.getenv("EMBED_MODEL", "all-MiniLM-L6-v2")
 _embed_model = SentenceTransformer(EMBED_MODEL_NAME)
@@ -316,7 +323,7 @@ or generating a molecule/reaction model.
 Respond with ONLY: "chat", "model", or "invalid".
 """
     try:
-        response = query_llm(llm_prompt, timeout=300, retries=1, model_name="llama3:8b").strip().lower()
+        response = query_llm(llm_prompt, timeout=150, retries=1, model_name="llama3:8b").strip().lower()
         if "model" in response:
             return "model"
         if "chat" in response:
