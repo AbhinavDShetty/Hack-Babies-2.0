@@ -32,7 +32,7 @@ function App() {
   const [viewerCollapsed, setViewerCollapsed] = useState(false);
   const userId = 1;
 
-  // Split layout sizing
+  // Split sizes
   const [sizes, setSizes] = useState(() => (viewerCollapsed ? [8, 92] : [60, 40]));
   const lastOpenSizesRef = useRef([60, 40]);
   const containerRef = useRef(null);
@@ -42,30 +42,24 @@ function App() {
     if (modelUrl) localStorage.setItem("modelUrl", modelUrl);
   }, [mode, modelUrl]);
 
-  // Sync collapse state with split sizes
   useEffect(() => {
-    if (viewerCollapsed) {
-      setSizes([8, 92]);
-    } else {
-      setSizes(lastOpenSizesRef.current || [60, 40]);
+    if (viewerCollapsed) setSizes([8, 92]);
+    else {
+      setSizes(lastOpenSizesRef.current);
       setTimeout(() => window.dispatchEvent(new Event("resize")), 200);
     }
   }, [viewerCollapsed]);
 
-  // Auto collapse/expand detection based on actual px width
   const checkCollapseState = (newSizes) => {
     if (!containerRef.current) return;
     const totalWidth = containerRef.current.offsetWidth;
     const leftWidthPx = (totalWidth * newSizes[0]) / 100;
 
-    // Collapse threshold < 50px
     if (!viewerCollapsed && leftWidthPx < 50) {
       setViewerCollapsed(true);
       setSizes([8, 92]);
       return;
     }
-
-    // Expand threshold > 50px
     if (viewerCollapsed && leftWidthPx > 50) {
       setViewerCollapsed(false);
       lastOpenSizesRef.current = newSizes;
@@ -74,19 +68,13 @@ function App() {
     }
   };
 
-  const onDrag = (newSizes) => {
-    setSizes(newSizes);
-    checkCollapseState(newSizes);
-  };
-
+  const onDrag = (newSizes) => { setSizes(newSizes); checkCollapseState(newSizes); };
   const onDragEnd = (newSizes) => {
     checkCollapseState(newSizes);
-    if (!viewerCollapsed && newSizes[0] > 8) {
-      lastOpenSizesRef.current = newSizes;
-    }
+    if (!viewerCollapsed && newSizes[0] > 8) lastOpenSizesRef.current = newSizes;
   };
 
-  // --- Backend handling ---
+  // Backend — load chat
   const loadChatFromBackend = async (id) => {
     try {
       const res = await fetch(`http://127.0.0.1:8000/api/chat/${id}/`);
@@ -97,17 +85,16 @@ function App() {
       setActiveModels(data.models || []);
       setChatId(id);
 
-      if (data.models && data.models.length > 0) {
+      if (data.models?.length > 0) {
         setMode("model");
-        const firstModel = data.models[0];
-        setModelUrl("http://127.0.0.1:8000" + firstModel.modelUrl);
+        setModelUrl("http://127.0.0.1:8000" + data.models[0].modelUrl);
         setCurrentModelIndex(0);
       } else {
         setMode("chat");
         setModelUrl(null);
       }
     } catch (err) {
-      console.error("❌ Failed to load chat:", err);
+      console.error("Failed to load chat:", err);
       setChatHistory([{ sender: "bot", text: "⚠️ Failed to load chat." }]);
       setMode("chat");
     }
@@ -117,63 +104,39 @@ function App() {
     e.preventDefault();
     if (!prompt.trim()) return;
     setLoading(true);
-
-    const userMsg = { sender: "user", text: prompt };
-    setChatHistory((prev) => [...prev, userMsg]);
+    setChatHistory((prev) => [...prev, { sender: "user", text: prompt }]);
 
     try {
       const res = await fetch("http://127.0.0.1:8000/api/generate-model/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          prompt,
-          user_id: userId,
-          chat_id: chatId,
-        }),
+        body: JSON.stringify({ prompt, user_id: userId, chat_id: chatId })
       });
 
       const data = await res.json();
 
       if (["invalid", "chat"].includes(data.mode)) {
-        if (mode !== "model") setMode("chat");
-        setChatHistory((prev) => [...prev, { sender: "bot", text: data.response }]);
+        setMode("chat");
         if (data.chat_id) setChatId(data.chat_id);
+        setChatHistory((prev) => [...prev, { sender: "bot", text: data.response }]);
       } else if (data.mode === "model") {
+        setMode("model");
         if (data.models?.length) {
           const newModels = data.models;
           const newModel = newModels[newModels.length - 1];
-          const modelPath = "http://127.0.0.1:8000" + newModel.modelUrl;
-
-          setMode("model");
-          setModelUrl(modelPath);
-          setChatId(data.chat_id || chatId);
+          setModelUrl("http://127.0.0.1:8000" + newModel.modelUrl);
           setActiveModels(newModels);
           setCurrentModelIndex(newModels.length - 1);
-        } else if (data.model_url) {
-          const singleModel = {
-            modelUrl: data.model_url,
-            thumbnail: data.thumbnail,
-            name: data.title || "Generated Model",
-            atom_data: data.atoms || [],
-          };
-          setMode("model");
-          setModelUrl("http://127.0.0.1:8000" + data.model_url);
-          setChatId(data.chat_id || chatId);
-          setActiveModels((prev) => [...prev, singleModel]);
-          setCurrentModelIndex((prev) => prev + 1);
         }
         setChatHistory((prev) => [...prev, { sender: "bot", text: data.response }]);
         setViewerCollapsed(false);
       }
     } catch (err) {
-      console.error("❌ Backend error:", err);
-      setChatHistory((prev) => [
-        ...prev,
-        { sender: "bot", text: "⚠️ Backend connection error." },
-      ]);
+      console.error("Backend error:", err);
+      setChatHistory((prev) => [...prev, { sender: "bot", text: "⚠️ Backend connection error." }]);
     } finally {
-      setLoading(false);
       setPrompt("");
+      setLoading(false);
     }
   };
 
@@ -201,9 +164,8 @@ function App() {
           return;
         }
       }
-    } catch {
-      console.warn("⚠️ No existing chat for model, starting new one.");
-    }
+    } catch {}
+
     setChatHistory([{ sender: "bot", text: item.description }]);
   };
 
@@ -218,24 +180,63 @@ function App() {
         userId={userId}
         refreshTrigger={refreshTrigger}
       />
+
       <div className="meku-theme app-container" ref={containerRef}>
         <Header />
-        {(mode === "chat" || mode === "model") && <BackButton onClick={() => setMode("home")} />}
+        {(mode === "chat" || mode === "model") && (
+          <BackButton onClick={() => setMode("home")} />
+        )}
 
         {/* HOME MODE */}
         {mode === "home" && (
           <>
             <Landing3D />
+
             <div id="home-grid" style={{ scrollMarginTop: "100vh" }}>
               <HomeGrid onSelectModel={handleTemplateSelect} userId={userId} />
+            </div>
+
+            <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-full max-w-xl px-4 z-50 pointer-events-none">
+              <div className="pointer-events-auto">
+                <InputBar
+                  prompt={prompt}
+                  setPrompt={setPrompt}
+                  handleSubmit={handleSubmit}
+                  loading={loading}
+                  mode={mode}
+                />
+              </div>
             </div>
           </>
         )}
 
+        {mode === "chat" && (
+          <>
+            <motion.div
+              className="chat-mode"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+            >
+              <div className="mt-16 p-4 w-250 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.15)] rounded-2xl overflow-hidden backdrop-blur-md shadow-[0_0_40px_rgba(99,102,241,0.15)]">
+                <ChatBox messages={chatHistory} />
+              </div>
+            </motion.div>
+
+            <div className="fixed bottom-8 left-1/2 -translate-x-1/2 w-300 max-w-[700px] px-4">
+              <InputBar
+                prompt={prompt}
+                setPrompt={setPrompt}
+                handleSubmit={handleSubmit}
+                loading={loading}
+                mode={mode}
+              />
+            </div>
+          </>
+        )}
         {/* MODEL MODE */}
         {mode === "model" && (
           <motion.div
-            className="model-chat-layout relative h-[calc(100vh-4rem)] px-4"
+            className="model-chat-layout relative h-[calc(100vh-4rem)] px-4 mt-10"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
           >
@@ -245,41 +246,35 @@ function App() {
               minSize={[8, 300]}
               gutterSize={8}
               snapOffset={10}
-              expandToMin={true}
+              expandToMin
               onDrag={onDrag}
               onDragEnd={onDragEnd}
             >
               {/* LEFT: Viewer */}
-              <div className="relative flex flex-col transition-all duration-300 ease-in-out overflow-hidden">
+              <div className="relative flex flex-col overflow-hidden mt-6">
                 {viewerCollapsed ? (
                   <div className="absolute top-2 left-1/2 -translate-x-1/2 z-30">
-                    <button
-                      onClick={() => setViewerCollapsed(false)}
-                      className="bg-[rgba(255,255,255,0.12)] hover:bg-[rgba(255,255,255,0.25)] text-white rounded-full w-7 h-7 flex items-center justify-center transition-all"
-                    >
-                      <ChevronRight size={16} />
+                    <button className="bg-[rgba(255,255,255,0.12)] hover:bg-[rgba(255,255,255,0.25)] text-white rounded-full w-7 h-7 flex items-center justify-center">
+                      <ChevronRight size={16} onClick={() => setViewerCollapsed(false)} />
                     </button>
                   </div>
                 ) : (
                   <>
-                    {/* Collapse button */}
                     <div className="absolute top-2 left-2 z-20">
                       <button
+                        className="bg-[rgba(255,255,255,0.08)] hover:bg-[rgba(255,255,255,0.2)] text-white rounded-full w-8 h-8 flex items-center justify-center"
                         onClick={() => setViewerCollapsed(true)}
-                        className="bg-[rgba(255,255,255,0.08)] hover:bg-[rgba(255,255,255,0.2)] text-white rounded-full w-8 h-8 flex items-center justify-center shadow-md"
                       >
                         <X size={16} />
                       </button>
                     </div>
 
-                    {/* Title */}
                     {activeModels.length > 0 && (
-                      <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-[rgba(0,0,0,0.65)] px-5 py-2 rounded-full text-sm text-white shadow-md backdrop-blur-md z-10">
+                      <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-[rgba(0,0,0,0.65)] px-5 py-2 rounded-full text-sm text-white shadow-md">
                         {activeModels[currentModelIndex]?.name || "Model"}
                       </div>
                     )}
 
-                    {/* Viewer */}
                     <div className="flex-1 w-full h-full">
                       {modelUrl && (
                         <ThreeViewer
@@ -290,7 +285,6 @@ function App() {
                       )}
                     </div>
 
-                    {/* Carousel */}
                     {activeModels.length > 0 && (
                       <div className="absolute bottom-0 w-full flex items-center justify-center mt-3 py-3 rounded-xl bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.08)] backdrop-blur-md">
                         {activeModels.map((m, idx) => (
@@ -316,7 +310,7 @@ function App() {
               </div>
 
               {/* RIGHT: Chat */}
-              <div className="relative flex flex-col h-full overflow-hidden flex-1 min-w-0">
+              <div className="relative flex flex-col h-full overflow-hidden flex-1 min-w-0 mt-6">
                 <div className="flex-1 overflow-y-auto p-4 chat-box bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.15)] rounded-2xl">
                   <ChatBox messages={chatHistory} />
                 </div>

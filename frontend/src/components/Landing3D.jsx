@@ -7,9 +7,6 @@ import * as THREE from "three";
 
 import dnaModel from "../assets/dna_molecule_final.fbx";
 
-/* ----------------------------------------------
-   🔧 CONFIG — centralized so you don’t repeat numbers
----------------------------------------------- */
 const MODEL_OFFSET = {
   x: 20,
   y: -5,
@@ -18,15 +15,11 @@ const MODEL_OFFSET = {
 
 const MODEL_ROTATION = [0, Math.PI / 2, 0];
 const MODEL_SCALE = 0.3;
-
-/* ----------------------------------------------
-   🧬 DNA Model Component
----------------------------------------------- */
 function DNAModel() {
   const fbx = useLoader(FBXLoader, dnaModel);
 
-  const pivot = useRef();     // wrapper pivot
-  const model = useRef();     // actual fbx mesh
+  const pivot = useRef();
+  const model = useRef();
   const mixerRef = useRef();
   const scrollRotation = useRef(0);
 
@@ -49,6 +42,23 @@ function DNAModel() {
     }
   }, [fbx]);
 
+  //rotate on scroll
+  useEffect(() => {
+    let lastScroll = window.scrollY;
+
+    const handleScroll = () => {
+      const now = window.scrollY;
+      const delta = now - lastScroll;
+
+      scrollRotation.current += delta * 0.01;
+
+      lastScroll = now;
+    };
+
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
   // Scroll rotation
   useFrame(() => {
     if (mixerRef.current) mixerRef.current.update(1 / 60);
@@ -66,9 +76,6 @@ function DNAModel() {
   );
 }
 
-/* ----------------------------------------------
-   🎮 Orbit Controls (locked vertical tilt)
----------------------------------------------- */
 function VerticalLockedControls() {
   const { gl, camera } = useThree();
   const controls = useRef();
@@ -99,9 +106,6 @@ function VerticalLockedControls() {
   );
 }
 
-/* ----------------------------------------------
-   🌌 Landing Section
----------------------------------------------- */
 export default function Landing3D() {
   return (
     <section
