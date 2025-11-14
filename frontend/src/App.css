@@ -125,7 +125,7 @@ body, html, #root {
 }
 
 .model-chat-layout > div {
-  border-radius: 1.25rem;
+  border-radius: 0.8rem;
   overflow: hidden;
   backdrop-filter: blur(20px);
 }
@@ -260,7 +260,8 @@ body, html, #root {
 .gutter {
   background-color: rgba(255, 255, 255, 0.02);
   transition: background-color 0.15s ease, box-shadow 0.15s ease;
-  width: 8px; /* horizontal gutter width */
+  margin-top: 1.5rem;
+  width: 8px;
   cursor: col-resize;
   z-index: 40;
 }

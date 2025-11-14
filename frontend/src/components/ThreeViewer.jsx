@@ -23,21 +23,21 @@ export default function ThreeViewer({ modelPath, atomData = [] }) {
       const renderer = new THREE.WebGLRenderer({ antialias: true });
       renderer.outputColorSpace = THREE.SRGBColorSpace;
       renderer.setSize(container.clientWidth, container.clientHeight);
-      renderer.setClearColor(0x0f172a);
+      renderer.setClearColor(0x000000, 0);
       renderer.setPixelRatio(window.devicePixelRatio);
       container.appendChild(renderer.domElement);
       rendererRef.current = renderer;
 
       const scene = new THREE.Scene();
-      scene.background = new THREE.Color(0x0f172a);
+      scene.background = null;
 
       const camera = new THREE.PerspectiveCamera(
-        45,
+        60,
         container.clientWidth / container.clientHeight,
         0.1,
         1000
       );
-      camera.position.set(0, 2, 6);
+      camera.position.set(2, 1, 8);
 
       const pmrem = new THREE.PMREMGenerator(renderer);
       scene.environment = pmrem.fromScene(new RoomEnvironment(renderer)).texture;
@@ -77,7 +77,6 @@ export default function ThreeViewer({ modelPath, atomData = [] }) {
       });
       resizeObserver.observe(container);
 
-      // === 🧭 Additions Start Here ===
       let userInteracting = false;
       let inactivityTimeout = null;
 
@@ -86,7 +85,7 @@ export default function ThreeViewer({ modelPath, atomData = [] }) {
         userInteracting = true;
         inactivityTimeout = setTimeout(() => {
           userInteracting = false;
-        }, 2000); // pause 2 seconds after user stops interacting
+        }, 2000);
       };
 
       // Add cursor feedback
@@ -153,7 +152,6 @@ export default function ThreeViewer({ modelPath, atomData = [] }) {
     };
   }, [modelPath]);
 
-  // Atom Legend (unchanged)
   const uniqueElements = [
     ...new Map(atomData.map((a) => [a.symbol, a.color])).entries(),
   ];
@@ -167,7 +165,7 @@ export default function ThreeViewer({ modelPath, atomData = [] }) {
   return (
     <div
       ref={containerRef}
-      className="relative w-full h-full rounded-2xl overflow-hidden border border-[rgba(255,255,255,0.12)] bg-transparent"
+      className="bottom-20 w-full h-full rounded-l-2xl overflow-hidden border border-[rgba(255,255,255,0.12)]"
     >
       {uniqueElements.length > 0 && (
         <div className="absolute top-4 right-4 bg-[rgba(0,0,0,0.6)] text-white rounded-lg px-4 py-3 shadow-lg backdrop-blur-md z-20">

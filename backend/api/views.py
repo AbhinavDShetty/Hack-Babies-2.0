@@ -105,7 +105,11 @@ def delete_chat_session(request, chat_id):
             if not chat:
                 return JsonResponse({"error": "Chat not found"}, status=404)
 
-            chat.linked_models.clear()  # remove associations but not models
+            linked_models = list(chat.linked_models.all())
+
+            for model in linked_models:
+                model.delete()
+
             chat.delete()
             return JsonResponse({"success": True})
         except Exception as e:
@@ -247,18 +251,26 @@ def upload_user_model(request, user_id):
         
     
 @csrf_exempt
-def delete_model(request, model_id):
+def delete_model(request, user_id, model_id):
     if request.method == "DELETE":
         try:
             model = ModelTemplate.objects.get(id=model_id)
-            ChatSession.objects.filter(related_model=model).delete()
+
+            for chat in model.chat_sessions.all():
+                chat.linked_models.remove(model)
+
             model.delete()
+
             return JsonResponse({"success": True})
+
         except ModelTemplate.DoesNotExist:
             return JsonResponse({"error": "Model not found"}, status=404)
+
         except Exception as e:
             return JsonResponse({"error": str(e)}, status=500)
+
     return JsonResponse({"error": "Invalid method"}, status=405)
+
 
 def get_user_models(request, user_id):
     models = ModelTemplate.objects.filter(user_id=user_id, category="custom").order_by("-created_at")

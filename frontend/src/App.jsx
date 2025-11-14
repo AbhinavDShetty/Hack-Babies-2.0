@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, use } from "react";
 import { motion } from "framer-motion";
 import Sidebar from "./components/Sidebar";
 import InputBar from "./components/InputBar";
@@ -32,14 +32,25 @@ function App() {
   const [viewerCollapsed, setViewerCollapsed] = useState(false);
   const userId = 1;
 
-  // Split sizes
   const [sizes, setSizes] = useState(() => (viewerCollapsed ? [8, 92] : [60, 40]));
   const lastOpenSizesRef = useRef([60, 40]);
   const containerRef = useRef(null);
 
+  // 🧠 Reset chat if home mode
+  useEffect(() => {
+    if (mode === "home") {
+      setChatHistory([]);
+      setChatId(null);
+      setModelUrl(null);
+      setActiveModels([]);
+      setCurrentModelIndex(0);
+    }
+  }, [mode]);
+
   useEffect(() => {
     localStorage.setItem("appMode", mode);
     if (modelUrl) localStorage.setItem("modelUrl", modelUrl);
+    if (chatId) localStorage.setItem("chatId", chatId);
   }, [mode, modelUrl]);
 
   useEffect(() => {
@@ -50,6 +61,17 @@ function App() {
     }
   }, [viewerCollapsed]);
 
+  useEffect(() => {
+    const savedChatId = localStorage.getItem("chatId");
+    const savedMode = localStorage.getItem("appMode");
+
+    if ((savedMode === "chat" || savedMode === "model") && savedChatId) {
+      loadChatFromBackend(savedChatId);
+    }
+  }, []);
+
+
+  // 📏 Collapse/expand threshold
   const checkCollapseState = (newSizes) => {
     if (!containerRef.current) return;
     const totalWidth = containerRef.current.offsetWidth;
@@ -67,39 +89,44 @@ function App() {
       return;
     }
   };
-
   const onDrag = (newSizes) => { setSizes(newSizes); checkCollapseState(newSizes); };
   const onDragEnd = (newSizes) => {
     checkCollapseState(newSizes);
     if (!viewerCollapsed && newSizes[0] > 8) lastOpenSizesRef.current = newSizes;
   };
 
-  // Backend — load chat
+
+
+  // 🧩 Load chat data from backend
   const loadChatFromBackend = async (id) => {
+    if (!id) return;
     try {
       const res = await fetch(`http://127.0.0.1:8000/api/chat/${id}/`);
       if (!res.ok) throw new Error("Chat not found");
       const data = await res.json();
 
+      setChatId(id);
       setChatHistory(data.messages || []);
       setActiveModels(data.models || []);
-      setChatId(id);
 
       if (data.models?.length > 0) {
+        const firstModel = data.models[0];
         setMode("model");
-        setModelUrl("http://127.0.0.1:8000" + data.models[0].modelUrl);
+        setModelUrl("http://127.0.0.1:8000" + firstModel.modelUrl);
         setCurrentModelIndex(0);
       } else {
         setMode("chat");
         setModelUrl(null);
       }
     } catch (err) {
-      console.error("Failed to load chat:", err);
+      console.error("❌ Failed to load chat:", err);
       setChatHistory([{ sender: "bot", text: "⚠️ Failed to load chat." }]);
       setMode("chat");
     }
   };
 
+
+  // 🧠 Handle message submission and backend response
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!prompt.trim()) return;
@@ -110,30 +137,31 @@ function App() {
       const res = await fetch("http://127.0.0.1:8000/api/generate-model/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt, user_id: userId, chat_id: chatId })
+        body: JSON.stringify({ prompt, user_id: userId, chat_id: chatId }),
       });
 
       const data = await res.json();
 
-      if (["invalid", "chat"].includes(data.mode)) {
-        setMode("chat");
-        if (data.chat_id) setChatId(data.chat_id);
-        setChatHistory((prev) => [...prev, { sender: "bot", text: data.response }]);
-      } else if (data.mode === "model") {
+      // 🔄 Always refresh chat after new response
+      if (data.chat_id) await loadChatFromBackend(data.chat_id);
+
+      if (data.mode === "model") {
         setMode("model");
-        if (data.models?.length) {
-          const newModels = data.models;
-          const newModel = newModels[newModels.length - 1];
-          setModelUrl("http://127.0.0.1:8000" + newModel.modelUrl);
-          setActiveModels(newModels);
-          setCurrentModelIndex(newModels.length - 1);
-        }
-        setChatHistory((prev) => [...prev, { sender: "bot", text: data.response }]);
         setViewerCollapsed(false);
+
+        // handle model URL display
+        const modelPath = "http://127.0.0.1:8000" + (data.model_url || data.models?.[0]?.modelUrl);
+        setModelUrl(modelPath);
       }
+
+      // add model's response message
+      setChatHistory((prev) => [...prev, { sender: "bot", text: data.response || "✅ Model generated" }]);
     } catch (err) {
-      console.error("Backend error:", err);
-      setChatHistory((prev) => [...prev, { sender: "bot", text: "⚠️ Backend connection error." }]);
+      console.error("❌ Backend error:", err);
+      setChatHistory((prev) => [
+        ...prev,
+        { sender: "bot", text: "⚠️ Backend connection error." },
+      ]);
     } finally {
       setPrompt("");
       setLoading(false);
@@ -141,6 +169,7 @@ function App() {
   };
 
   const handleSelectSession = (session) => {
+    if (!session) return;
     setChatId(session.id);
     loadChatFromBackend(session.id);
     setSidebarOpen(false);
@@ -158,16 +187,20 @@ function App() {
       if (res.ok) {
         const data = await res.json();
         if (data.chat_id) {
-          setChatId(data.chat_id);
-          setChatHistory(data.messages || []);
-          setActiveModels(data.models || []);
+          loadChatFromBackend(data.chat_id);
           return;
         }
       }
-    } catch {}
+    } catch {
+      console.warn("⚠️ No chat found, starting new one.");
+    }
 
     setChatHistory([{ sender: "bot", text: item.description }]);
   };
+
+  useEffect(() => {
+    console.log("session id:" + chatId);
+  }, [chatId]);
 
   const currentAtomData = activeModels[currentModelIndex]?.atom_data || [];
 
@@ -191,7 +224,6 @@ function App() {
         {mode === "home" && (
           <>
             <Landing3D />
-
             <div id="home-grid" style={{ scrollMarginTop: "100vh" }}>
               <HomeGrid onSelectModel={handleTemplateSelect} userId={userId} />
             </div>
@@ -210,6 +242,7 @@ function App() {
           </>
         )}
 
+        {/* CHAT MODE */}
         {mode === "chat" && (
           <>
             <motion.div
@@ -217,26 +250,29 @@ function App() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
             >
-              <div className="mt-16 p-4 w-250 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.15)] rounded-2xl overflow-hidden backdrop-blur-md shadow-[0_0_40px_rgba(99,102,241,0.15)]">
-                <ChatBox messages={chatHistory} />
+              <div className="relative flex flex-col h-[85vh] overflow-hidden flex-1 min-w-200 w-300 mt-6 top-16 items-center">
+                <div className="flex-1 overflow-y-auto p-4 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.15)] rounded-t-2xl">
+                  <ChatBox messages={chatHistory} />
+                </div>
+                <div className="absolute bottom-2 flex justify-center flex-col items-center border-[rgba(255,255,255,0.15)] p-2 w-[calc(100%-120px)] min-w-[350px]">
+                  <InputBar
+                    prompt={prompt}
+                    setPrompt={setPrompt}
+                    handleSubmit={handleSubmit}
+                    loading={loading}
+                    mode={mode}
+                  />
+                </div>
               </div>
             </motion.div>
-
-            <div className="fixed bottom-8 left-1/2 -translate-x-1/2 w-300 max-w-[700px] px-4">
-              <InputBar
-                prompt={prompt}
-                setPrompt={setPrompt}
-                handleSubmit={handleSubmit}
-                loading={loading}
-                mode={mode}
-              />
-            </div>
           </>
         )}
+
+
         {/* MODEL MODE */}
         {mode === "model" && (
           <motion.div
-            className="model-chat-layout relative h-[calc(100vh-4rem)] px-4 mt-10"
+            className="model-chat-layout relative h-[calc(100vh-4rem)] px-4 mt-10 rounded-2xl overflow-hidden"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
           >
@@ -244,7 +280,7 @@ function App() {
               className="flex h-full w-full"
               sizes={sizes}
               minSize={[8, 300]}
-              gutterSize={8}
+              gutterSize={5}
               snapOffset={10}
               expandToMin
               onDrag={onDrag}
@@ -254,16 +290,19 @@ function App() {
               <div className="relative flex flex-col overflow-hidden mt-6">
                 {viewerCollapsed ? (
                   <div className="absolute top-2 left-1/2 -translate-x-1/2 z-30">
-                    <button className="bg-[rgba(255,255,255,0.12)] hover:bg-[rgba(255,255,255,0.25)] text-white rounded-full w-7 h-7 flex items-center justify-center">
-                      <ChevronRight size={16} onClick={() => setViewerCollapsed(false)} />
+                    <button
+                      onClick={() => setViewerCollapsed(false)}
+                      className="bg-[rgba(255,255,255,0.12)] hover:bg-[rgba(255,255,255,0.25)] text-white rounded-full w-7 h-7 flex items-center justify-center"
+                    >
+                      <ChevronRight size={16} />
                     </button>
                   </div>
                 ) : (
                   <>
                     <div className="absolute top-2 left-2 z-20">
                       <button
-                        className="bg-[rgba(255,255,255,0.08)] hover:bg-[rgba(255,255,255,0.2)] text-white rounded-full w-8 h-8 flex items-center justify-center"
                         onClick={() => setViewerCollapsed(true)}
+                        className="bg-[rgba(255,255,255,0.08)] hover:bg-[rgba(255,255,255,0.2)] text-white rounded-full w-8 h-8 flex items-center justify-center"
                       >
                         <X size={16} />
                       </button>
@@ -285,8 +324,9 @@ function App() {
                       )}
                     </div>
 
+                    {/* Carousel */}
                     {activeModels.length > 0 && (
-                      <div className="absolute bottom-0 w-full flex items-center justify-center mt-3 py-3 rounded-xl bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.08)] backdrop-blur-md">
+                      <div className="absolute bottom-0 w-full flex items-center justify-center mt-3 py-3 border border-[rgba(255,255,255,0.08)] backdrop-blur-md">
                         {activeModels.map((m, idx) => (
                           <img
                             key={idx}
@@ -296,11 +336,10 @@ function App() {
                               setCurrentModelIndex(idx);
                               setModelUrl("http://127.0.0.1:8000" + m.modelUrl);
                             }}
-                            className={`w-14 h-14 rounded-lg object-cover cursor-pointer border-2 transition-all ${
-                              idx === currentModelIndex
-                                ? "border-blue-400 scale-105"
-                                : "border-transparent opacity-80 hover:opacity-100"
-                            }`}
+                            className={`w-14 h-14 rounded-xl object-cover cursor-pointer border-2 transition-all ${idx === currentModelIndex
+                              ? "border-blue-400 scale-105"
+                              : "border-transparent opacity-80 hover:opacity-100"
+                              }`}
                           />
                         ))}
                       </div>
@@ -310,11 +349,11 @@ function App() {
               </div>
 
               {/* RIGHT: Chat */}
-              <div className="relative flex flex-col h-full overflow-hidden flex-1 min-w-0 mt-6">
-                <div className="flex-1 overflow-y-auto p-4 chat-box bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.15)] rounded-2xl">
+              <div className="relative flex flex-col h-full overflow-hidden flex-1 min-w-0 mt-6 items-center">
+                <div className="flex-1 overflow-y-auto p-4 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.15)] rounded-tr-2xl">
                   <ChatBox messages={chatHistory} />
                 </div>
-                <div className="p-3 border-t border-[rgba(255,255,255,0.15)]">
+                <div className="absolute bottom-5 flex justify-center flex-col items-center border-[rgba(255,255,255,0.15)] p-2 w-[calc(100%-120px)] min-w-[350px]">
                   <InputBar
                     prompt={prompt}
                     setPrompt={setPrompt}

@@ -7,13 +7,9 @@ import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 export default function ChatBox({ messages }) {
   return (
     <div
-      className="chatbox flex flex-col gap-4 p-6 overflow-y-auto custom-scrollbar"
+      className="flex flex-col gap-4 p-6 overflow-y-auto custom-scrollbar"
       style={{
         height: "calc(100vh - 280px)",
-        background: "rgba(255,255,255,0.04)",
-        borderRadius: "1rem",
-        border: "1px solid rgba(255,255,255,0.1)",
-        backdropFilter: "blur(10px)",
       }}
     >
       {messages.map((msg, i) => (
