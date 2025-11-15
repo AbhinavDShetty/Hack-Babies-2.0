@@ -61,7 +61,7 @@ export default function App() {
   const [chatHistory, setChatHistory] = useState([]);
   const [chatId, setChatId] = useState(null);
   const [modelUrl, setModelUrl] = useState(
-    localStorage.getItem("modelUrl") || null
+    localStorage.getItem(STORAGE_KEYS.MODEL_URL) || null
   );
   const [activeModels, setActiveModels] = useState([]);
   const [currentModelIndex, setCurrentModelIndex] = useState(0);
@@ -94,21 +94,50 @@ export default function App() {
 
   // Persist some app state
   useEffect(() => {
-    localStorage.setItem("appMode", mode);
-    if (modelUrl) localStorage.setItem("modelUrl", modelUrl);
-    if (chatId) localStorage.setItem("chatId", chatId);
+    localStorage.setItem(STORAGE_KEYS.APP_MODE, mode);
+    if (modelUrl) localStorage.setItem(STORAGE_KEYS.MODEL_URL, modelUrl);
+    if (chatId) localStorage.setItem(STORAGE_KEYS.CHAT_ID, chatId);
   }, [mode, modelUrl, chatId]);
+
+  /* ----------------------
+     Backend helpers
+     ---------------------- */
+  const loadChatFromBackend = async (id) => {
+    if (!id) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/chat/${id}/`);
+      if (!res.ok) throw new Error("Chat not found");
+      const data = await res.json();
+
+      setChatId(id);
+      setChatHistory(data.messages || []);
+      setActiveModels(data.models || []);
+
+      if (data.models?.length > 0) {
+        const first = data.models[0];
+        setMode("model");
+        setModelUrl(`${API_BASE}${first.modelUrl}`);
+        setCurrentModelIndex(0);
+      } else {
+        setMode("chat");
+        setModelUrl(null);
+      }
+    } catch (err) {
+      console.error("Failed to load chat:", err);
+      setChatHistory([{ sender: "bot", text: "⚠️ Failed to load chat." }]);
+      setMode("chat");
+    }
+  };
 
   // Load saved chat if present
   useEffect(() => {
-    const savedChatId = localStorage.getItem("chatId");
-    const savedMode = localStorage.getItem("appMode");
+    const savedChatId = localStorage.getItem(STORAGE_KEYS.CHAT_ID);
+    const savedMode = localStorage.getItem(STORAGE_KEYS.APP_MODE);
 
     if ((savedMode === "chat" || savedMode === "model") && savedChatId) {
       loadChatFromBackend(savedChatId);
     }
   }, []);
-
 
   useEffect(() => {
     if (!chatId) return;
@@ -118,7 +147,6 @@ export default function App() {
     setSizes([60, 40]);
     lastOpenSizesRef.current = [60, 40];
   }, [chatId]);
-
 
   const cancelAnimation = () => {
     if (animRef.current) {
@@ -133,16 +161,19 @@ export default function App() {
     setIsAnimating(true);
 
     const start = performance.now();
-    const frames = Math.max(8, Math.round((duration / 16)));
     const leftStart = from[0];
     const leftDelta = to[0] - from[0];
 
     const step = (now) => {
       const t = Math.min(1, (now - start) / duration);
+      // smooth ease in/out
       const ease = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
       const currentLeft = leftStart + leftDelta * ease;
       const currentRight = 100 - currentLeft;
-      setSizes([Number(currentLeft.toFixed(2)), Number(currentRight.toFixed(2))]);
+      setSizes([
+        Number(currentLeft.toFixed(2)),
+        Number(currentRight.toFixed(2)),
+      ]);
 
       if (t < 1) {
         animRef.current = requestAnimationFrame(step);
@@ -194,12 +225,8 @@ export default function App() {
     }
   };
 
-
   const triggerCollapse = () => {
     if (isAnimating) return;
-    if (animRef.current) {
-      animRef.current.cancelAnimation = true;
-    }
 
     cancelAnimation();
     viewerCollapsedRef.current = true;
@@ -215,36 +242,6 @@ export default function App() {
     animateSizes(sizes, [60, 40], 260);
   };
 
-  /* ----------------------
-     Backend helpers
-     ---------------------- */
-  const loadChatFromBackend = useCallback(async (id) => {
-    if (!id) return;
-    try {
-      const res = await fetch(`${API_BASE}/api/chat/${id}/`);
-      if (!res.ok) throw new Error("Chat not found");
-      const data = await res.json();
-
-      setChatId(id);
-      setChatHistory(data.messages || []);
-      setActiveModels(data.models || []);
-
-      if (data.models?.length > 0) {
-        const first = data.models[0];
-        setMode("model");
-        setModelUrl(`${API_BASE}${first.modelUrl}`);
-        setCurrentModelIndex(0);
-      } else {
-        setMode("chat");
-        setModelUrl(null);
-      }
-    } catch (err) {
-      console.error("Failed to load chat:", err);
-      setChatHistory([{ sender: "bot", text: "⚠️ Failed to load chat." }]);
-      setMode("chat");
-    }
-  };
-
   // 🧠 Handle message submission and backend response
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -252,23 +249,23 @@ export default function App() {
     setLoading(true);
     setChatHistory((prev) => [...prev, { sender: "user", text: prompt }]);
 
-      try {
-        const res = await fetch(`${API_BASE}/api/generate-model/`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt, user_id: userId, chat_id: chatId }),
-        });
+    try {
+      const res = await fetch(`${API_BASE}/api/generate-model/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt, user_id: userId, chat_id: chatId }),
+      });
 
-        if (!res.ok) {
-          const txt = await res.text();
-          throw new Error(txt || "Server error");
-        }
-        const data = await res.json();
+      if (!res.ok) {
+        const txt = await res.text();
+        throw new Error(txt || "Server error");
+      }
+      const data = await res.json();
 
-        // if backend returned a chat id, reload chat
-        if (data.chat_id) {
-          await loadChatFromBackend(data.chat_id);
-        }
+      // if backend returned a chat id, reload chat
+      if (data.chat_id) {
+        await loadChatFromBackend(data.chat_id);
+      }
 
       if (data.mode === "model") {
         setMode("model");
@@ -278,7 +275,7 @@ export default function App() {
 
         // handle model URL display
         const modelPath =
-          "http://127.0.0.1:8000" + (data.model_url || data.models?.[0]?.modelUrl);
+          API_BASE + (data.model_url || data.models?.[0]?.modelUrl);
         setModelUrl(modelPath);
       }
     } catch (err) {
@@ -301,13 +298,13 @@ export default function App() {
   };
 
   const handleTemplateSelect = async (item) => {
-    const modelPath = "http://127.0.0.1:8000" + item.modelUrl;
+    const modelPath = API_BASE + item.modelUrl;
     setMode("model");
     setModelUrl(modelPath);
 
     try {
       const res = await fetch(
-        `http://127.0.0.1:8000/api/model-chat/?model_name=${encodeURIComponent(
+        `${API_BASE}/api/model-chat/?model_name=${encodeURIComponent(
           item.name
         )}`
       );
@@ -317,32 +314,14 @@ export default function App() {
           loadChatFromBackend(data.chat_id);
           return;
         }
-      } catch (err) {
-        console.warn("No chat for template:", err);
       }
+    } catch (err) {
+      console.warn("No chat for template:", err);
+    }
 
-      // fallback: put description in chat
-      setChatHistory([{ sender: "bot", text: item.description }]);
-    },
-    [loadChatFromBackend]
-  );
-
-  /* ----------------------
-     Session selection used by Sidebar
-     ---------------------- */
-  const handleSelectSession = useCallback(
-    (session) => {
-      if (!session) return;
-      loadChatFromBackend(session.id);
-      setSidebarOpen(false);
-    },
-    [loadChatFromBackend]
-  );
-
-  /* ----------------------
-     Deleting / refreshing sessions helper (optional)
-     ---------------------- */
-  const triggerRefresh = useCallback(() => setRefreshTrigger((s) => s + 1), []);
+    // fallback: put description in chat
+    setChatHistory([{ sender: "bot", text: item.description }]);
+  };
 
   /* ----------------------
      Derived / memoized values
@@ -417,7 +396,11 @@ export default function App() {
         {/* ---------------- CHAT MODE ---------------- */}
         {mode === "chat" && (
           <>
-            <motion.div className="chat-mode" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+            <motion.div
+              className="chat-mode"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+            >
               <div className="relative flex flex-col h-[85vh] overflow-hidden flex-1 min-w-200 w-300 mt-6 top-16 items-center">
                 <div className="flex-1 overflow-y-auto p-4 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.15)] rounded-t-2xl">
                   <ChatBox messages={chatHistory} />
@@ -438,7 +421,11 @@ export default function App() {
 
         {/* MODEL MODE */}
         {mode === "model" && (
-          <motion.div className="model-chat-layout relative h-[calc(100vh-4rem)] px-4 mt-10 rounded-2xl overflow-hidden" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+          <motion.div
+            className="model-chat-layout relative h-[calc(100vh-4rem)] px-4 mt-10 rounded-2xl overflow-hidden"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+          >
             <Split
               className="flex h-full w-full"
               sizes={sizes}
@@ -446,8 +433,8 @@ export default function App() {
               gutterSize={5}
               snapOffset={10}
               expandToMin
-              onDrag={handleSplitDrag}
-              onDragEnd={handleSplitDragEnd}
+              onDrag={onDrag}
+              onDragEnd={onDragEnd}
             >
               {/* LEFT: 3D Viewer column */}
               <div className="relative flex flex-col overflow-hidden mt-6">
@@ -460,7 +447,6 @@ export default function App() {
                         triggerExpand();
                       }}
                       className="bg-[rgba(255,255,255,0.12)] hover:bg-[rgba(255,255,255,0.25)] text-white rounded-full w-7 h-7 flex items-center justify-center"
-                      onClick={() => setViewerCollapsed(false)}
                     >
                       <ChevronRight size={16} />
                     </button>
@@ -487,7 +473,11 @@ export default function App() {
 
                     <div className="flex-1 w-full h-full">
                       {modelUrl && (
-                        <ThreeViewer key={`${modelUrl}-${viewerCollapsed}`} modelPath={modelUrl} atomData={currentAtomData} />
+                        <ThreeViewer
+                          key={`${modelUrl}-${viewerCollapsed}`}
+                          modelPath={modelUrl}
+                          atomData={currentAtomData}
+                        />
                       )}
                     </div>
 
@@ -503,7 +493,11 @@ export default function App() {
                               setCurrentModelIndex(idx);
                               setModelUrl(`${API_BASE}${m.modelUrl}`);
                             }}
-                            className={`w-14 h-14 rounded-xl object-cover cursor-pointer border-2 transition-all ${idx === currentModelIndex ? "border-blue-400 scale-105" : "border-transparent opacity-80 hover:opacity-100"}`}
+                            className={`w-14 h-14 rounded-xl object-cover cursor-pointer border-2 transition-all ${
+                              idx === currentModelIndex
+                                ? "border-blue-400 scale-105"
+                                : "border-transparent opacity-80 hover:opacity-100"
+                            }`}
                           />
                         ))}
                       </div>
@@ -518,7 +512,13 @@ export default function App() {
                   <ChatBox messages={chatHistory} />
                 </div>
                 <div className="absolute bottom-5 flex justify-center flex-col items-center border-[rgba(255,255,255,0.15)] p-2 w-[calc(100%-120px)] min-w-[350px]">
-                  <InputBar prompt={prompt} setPrompt={setPrompt} handleSubmit={handleSubmit} loading={loading} mode={mode} />
+                  <InputBar
+                    prompt={prompt}
+                    setPrompt={setPrompt}
+                    handleSubmit={handleSubmit}
+                    loading={loading}
+                    mode={mode}
+                  />
                 </div>
               </div>
             </Split>

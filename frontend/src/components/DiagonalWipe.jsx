@@ -22,7 +22,7 @@ export default function DiagonalWipe({ progress }) {
     <motion.div
       className="
         pointer-events-none
-        fixed inset-0 z-[38]
+        fixed inset-0 z-[30]
         backdrop-blur-[20px]
         bg-[rgba(10,15,25,0.6)]
         border-t border-white/5

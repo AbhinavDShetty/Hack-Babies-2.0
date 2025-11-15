@@ -13,7 +13,7 @@ export default function Header({ onSidebarToggle }) {
           fixed 
           top-0 
           left-0 
-          z-[2000]   // ⬅ SUPER HIGH
+          z-[200]   // ⬅ SUPER HIGH
           py-4
           h-20
           bg-[rgba(255, 255, 255, 0.03)]
