@@ -1,10 +1,7 @@
 export default function InputBar({ prompt, setPrompt, handleSubmit, loading }) {
   return (
     <>
-      <form
-        onSubmit={handleSubmit}
-        className="input-box"
-      >
+      <form onSubmit={handleSubmit} className="input-box">
         <input
           type="text"
           placeholder="Ask AI to create or explain a molecule..."
@@ -13,15 +10,11 @@ export default function InputBar({ prompt, setPrompt, handleSubmit, loading }) {
           required
           className=""
         />
-        <button
-          type="submit"
-          disabled={loading}
-          className=""
-        >
+        <button type="submit" disabled={loading} className="">
           {loading ? "..." : "➤"}
         </button>
       </form>
-      <div class="input-bar-note mt-1 text-center text-[12px] text-gray-400">
+      <div className="input-bar-note mt-1 text-center text-[12px] text-gray-400">
         AI can make mistakes. Dont blame us if it does!
       </div>
     </>

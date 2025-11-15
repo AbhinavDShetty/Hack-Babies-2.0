@@ -13,10 +13,10 @@ export default function Header({ onSidebarToggle }) {
           fixed 
           top-0 
           left-0 
-          z-2 
+          z-[2000]   // ⬅ SUPER HIGH
           py-4
           h-20
-          bg-[rgba(255,255,255,0.07)]
+          bg-[rgba(255, 255, 255, 0.03)]
           backdrop-blur-md
           border-b border-[rgba(255,255,255,0.15)]
           shadow-lg
@@ -24,7 +24,7 @@ export default function Header({ onSidebarToggle }) {
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
       >
-        <div 
+        <div
           className="
             logo 
             title 

@@ -14,17 +14,16 @@ export default function Sidebar({
   // Fetch all chat sessions (unified model + chat)
   const fetchSessions = async () => {
     try {
-      const res = await fetch(`http://127.0.0.1:8000/api/sessions/${userId}/`);
-      if (!res.ok) throw new Error("Failed to fetch sessions");
-      const data = await res.json();
-
-      // Sort by newest first
-      const sorted = data.sort(
-        (a, b) => new Date(b.created_at) - new Date(a.created_at)
+      const res = await fetch(
+        `http://127.0.0.1:8000/api/chats/?user_id=${userId}`
       );
-      setSessions(sorted);
-    } catch (err) {
-      console.error("❌ Error fetching sessions:", err);
+
+      if (!res.ok) throw new Error("Failed to fetch chat sessions");
+
+      const data = await res.json();
+      setSessions(data); // your existing state setter
+    } catch (error) {
+      console.error("❌ Error fetching sessions:", error);
     }
   };
 
@@ -119,7 +118,9 @@ export default function Sidebar({
                       {s.title || "Untitled Chat"}
                     </span>
                     <span className="text-gray-400 text-xs truncate">
-                      {s.model_name ? `Model: ${s.model_name}` : "No models yet"}
+                      {s.model_name
+                        ? `Model: ${s.model_name}`
+                        : "No models yet"}
                     </span>
                   </div>
                 </div>

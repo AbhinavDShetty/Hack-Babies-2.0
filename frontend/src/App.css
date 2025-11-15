@@ -25,7 +25,7 @@ body, html, #root {
   font-weight: 700;
   font-size: 1.5rem;
   margin-bottom: 1rem;
-  background: linear-gradient(90deg, #60a5fa, #a78bfa);
+  background: linear-gradient(90deg, hsl(213, 62%, 63%), #a78bfa);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
@@ -34,7 +34,7 @@ body, html, #root {
   font-size: 2rem;
   font-weight: 800;
   margin-bottom: 1rem;
-  background: linear-gradient(90deg, #93c5fd, #c084fc);
+  background: linear-gradient(90deg, #ffffff, #ffffff);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
@@ -82,6 +82,7 @@ body, html, #root {
   max-width: 700px;
   backdrop-filter: blur(12px);
   transition: all 0.3s ease;
+  z-index: 100;
 }
 
 .input-box input {
@@ -299,4 +300,91 @@ body, html, #root {
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background-color: #888;
+}
+
+
+/* Smooth scroll like LN */
+html {
+  scroll-behavior: smooth;
+}
+
+/* LN-style shadows */
+.shadow-heavy {
+  box-shadow: 0px 20px 40px rgba(0, 0, 0, 0.45);
+}
+
+
+/* gentle hero spacing and fonts */
+#landing-3d h1 {
+  /* keep metrics crisp for LN-like bold heading */
+  line-height: 0.95;
+  letter-spacing: -0.02em;
+}
+
+/* subtle dark card for canvas fallback */
+canvas { display: block; }
+
+/* scroll indicator hover */
+#landing-3d a[aria-label="Scroll to content"]:hover .text-xs {
+  color: #fff;
+}
+
+
+/* base hero fonts */
+#landing-variant-a h1,
+#landing-variant-b h1,
+#landing-variant-c h1 {
+  line-height: 0.92;
+  letter-spacing: -0.02em;
+}
+
+/* ensure canvas fills its container */
+canvas { display: block; }
+
+/* optional: subtle responsive tweaks */
+@media (max-width: 768px) {
+  #landing-variant-b .diagonal-mask { clip-path: none; border-radius: 12px; }
+}
+
+/* scroll indicator style (if you re-add one) */
+.scroll-indicator {
+  width: 40px; height: 40px; border-radius: 999px; background: rgba(255,255,255,0.05);
+  display:flex;align-items:center;justify-content:center;
+}
+
+
+/* Pinterest-style Masonry Grid */
+.masonry-grid {
+  column-count: 3;
+  column-gap: 1.75rem;
+}
+
+.masonry-grid > div {
+  break-inside: avoid;
+  margin-bottom: 1.75rem;
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+  .masonry-grid {
+    column-count: 2;
+  }
+}
+
+@media (max-width: 700px) {
+  .masonry-grid {
+    column-count: 1;
+  }
+}
+
+
+/* smoother clip-path animation */
+* {
+  clip-path: border-box;
+  will-change: clip-path;
+}
+
+/* prevent wipe jitter */
+html, body {
+  overflow-x: hidden;
 }
