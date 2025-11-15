@@ -87,6 +87,9 @@ export default function Landing3D() {
 
         <p className="mt-6 text-lg text-white/70 max-w-md">
           Visualize and interact with molecular structures
+
+        <p className="mt-6 text-lg text-white/70 max-w-md">
+          Visualize and interact with molecular structures
         </p>
 
         <button
@@ -95,7 +98,10 @@ export default function Landing3D() {
           }
           className="mt-8 px-8 py-3 rounded-full text-white font-semibold shadow-lg transition-transform hover:scale-105"
           style={{ background: "linear-gradient(90deg,#5c6cff,#8f6bff)" }}
+          className="mt-8 px-8 py-3 rounded-full text-white font-semibold shadow-lg transition-transform hover:scale-105"
+          style={{ background: "linear-gradient(90deg,#5c6cff,#8f6bff)" }}
         >
+          Get Started →
           Get Started →
         </button>
       </div>

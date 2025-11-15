@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import MoleculeCard from "./MoleculeCard";
+import { motion } from "framer-motion";
+import MoleculeCard from "./MoleculeCard";
 
 export default function HomeGrid({ onSelectModel, userId }) {
   const [data, setData] = useState({});
@@ -24,6 +26,8 @@ export default function HomeGrid({ onSelectModel, userId }) {
 
   if (loading) {
     return (
+      <div className="flex items-center justify-center h-[300px] text-gray-400 text-lg">
+        Loading molecules...
       <div className="flex items-center justify-center h-[300px] text-gray-400 text-lg">
         Loading molecules...
       </div>
@@ -64,7 +68,23 @@ export default function HomeGrid({ onSelectModel, userId }) {
                 <h3 className="text-3xl font-bold text-white">
                   {category === "custom" ? "My Creations" : category}
                 </h3>
+          return (
+            <div key={category}>
+              {/* CATEGORY HEADER */}
+              <div className="flex items-center justify-between mb-8">
+                <h3 className="text-3xl font-bold text-white">
+                  {category === "custom" ? "My Creations" : category}
+                </h3>
 
+                {hasMore && (
+                  <button
+                    onClick={() => setExpanded(isExpanded ? null : category)}
+                    className="text-sm text-gray-300 hover:text-white"
+                  >
+                    {isExpanded ? "Show Less ▲" : "Show More ▼"}
+                  </button>
+                )}
+              </div>
                 {hasMore && (
                   <button
                     onClick={() => setExpanded(isExpanded ? null : category)}
@@ -93,7 +113,34 @@ export default function HomeGrid({ onSelectModel, userId }) {
                     />
                   ))}
                 </div>
+              {/* GRID */}
+              <motion.div
+                layout
+                animate={{
+                  height: isExpanded ? "auto" : hasMore ? "430px" : "auto",
+                }}
+                transition={{ type: "spring", stiffness: 70, damping: 20 }}
+                className="overflow-hidden"
+              >
+                <div className="grid gap-14 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  {items.map((item, i) => (
+                    <MoleculeCard
+                      key={i}
+                      item={item}
+                      onSelect={onSelectModel}
+                    />
+                  ))}
+                </div>
 
+                {!isExpanded && hasMore && (
+                  <div className="w-full h-32 mt-6 bg-gradient-to-t from-black/60 to-transparent pointer-events-none"></div>
+                )}
+              </motion.div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
                 {!isExpanded && hasMore && (
                   <div className="w-full h-32 mt-6 bg-gradient-to-t from-black/60 to-transparent pointer-events-none"></div>
                 )}
@@ -105,3 +152,4 @@ export default function HomeGrid({ onSelectModel, userId }) {
     </section>
   );
 }
+

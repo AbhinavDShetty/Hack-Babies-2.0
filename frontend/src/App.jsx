@@ -145,6 +145,8 @@ export default function App() {
     checkCollapseState(newSizes);
     if (!viewerCollapsed && newSizes[0] > 8)
       lastOpenSizesRef.current = newSizes;
+    if (!viewerCollapsed && newSizes[0] > 8)
+      lastOpenSizesRef.current = newSizes;
   };
 
   /* ----------------------
