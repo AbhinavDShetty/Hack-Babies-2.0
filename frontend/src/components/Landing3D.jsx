@@ -77,7 +77,7 @@ export default function Landing3D() {
       </div>
 
       {/* HERO TEXT */}
-      <div className="absolute top-[22vh] left-20 z-[200] select-none max-w-xl">
+      <div className="absolute top-[22vh] left-20 z-200 select-none max-w-xl flex flex-col items-center pointer-events-none">
         <h1
           className="font-extrabold leading-tight text-white"
           style={{ fontSize: "clamp(3.5rem, 5vw, 6rem)" }}
@@ -85,23 +85,13 @@ export default function Landing3D() {
           Explore <br /> Secrets of Matter
         </h1>
 
-        <p className="mt-6 text-lg text-white/70 max-w-md">
+        <p className="mt-6 text-lg text-white/70 max-w-md text-center">
           Visualize and interact with molecular structures
         </p>
-
-        <button
-          onClick={() =>
-            window.scrollTo({ top: window.innerHeight, behavior: "smooth" })
-          }
-          className="mt-8 px-8 py-3 rounded-full text-white font-semibold shadow-lg transition-transform hover:scale-105"
-          style={{ background: "linear-gradient(90deg,#5c6cff,#8f6bff)" }}
-        >
-          Get Started →
-        </button>
       </div>
 
       {/* 3D DNA VIEWER */}
-      <div className="absolute right-0 top-0 h-full w-[50%] z-[150] pointer-events-none">
+      <div className="absolute right-0 top-0 h-full w-[50%] z-150 pointer-events-none">
         <Canvas
           gl={{ alpha: true }}
           camera={{ position: [0, 1.2, 10], fov: 45 }}

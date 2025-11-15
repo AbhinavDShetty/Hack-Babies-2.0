@@ -18,6 +18,8 @@ import ThreeViewer from "./components/ThreeViewer";
 import ChatBox from "./components/ChatBox";
 import InputBar from "./components/InputBar";
 import BackButton from "./components/BackButton";
+import Footer from "./components/Footer";
+
 
 import "./App.css";
 
@@ -373,14 +375,15 @@ export default function App() {
             {/* HomeGrid placed below the hero. paddingTop ensures it starts after hero. */}
             <div
               id="home-grid"
-              className="relative z-[50] w-full"
+              className="relative z-50 w-screen"
               style={{ paddingTop: "100vh" }}
             >
               <HomeGrid onSelectModel={handleTemplateSelect} userId={userId} />
+              <Footer />
             </div>
 
             {/* Floating input at bottom (home) */}
-            <div className="z-[200] fixed bottom-6 left-1/2 -translate-x-1/2 w-full max-w-xl px-4 pointer-events-none">
+            <div className="z-200 fixed bottom-6 left-1/2 -translate-x-1/2 w-full max-w-xl px-4 pointer-events-none">
               <div className="pointer-events-auto">
                 <InputBar
                   prompt={prompt}

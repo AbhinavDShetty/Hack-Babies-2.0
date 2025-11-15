@@ -25,7 +25,7 @@ export default function HomeGrid({ onSelectModel, userId }) {
   return (
     <section
       className="
-        w-full min-h-screen 
+        w-screen min-h-screen 
         px-10 md:px-20 
         pt-36 pb-20
         backdrop-blur-2xl
@@ -79,7 +79,7 @@ export default function HomeGrid({ onSelectModel, userId }) {
                   transition={{ type: "spring", stiffness: 70, damping: 20 }}
                   className="overflow-hidden"
                 >
-                  <div className="grid gap-14 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  <div className="grid gap-14 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 p-4">
                     {items.map((item, i) => (
                       <MoleculeCard
                         key={i}
@@ -90,7 +90,7 @@ export default function HomeGrid({ onSelectModel, userId }) {
                   </div>
 
                   {!isExpanded && hasMore && (
-                    <div className="w-full h-32 mt-6 bg-gradient-to-t from-black/60 to-transparent pointer-events-none"></div>
+                    <div className="w-full h-32 mt-6 bg-linear-to-t from-black/60 to-transparent pointer-events-none"></div>
                   )}
                 </motion.div>
               </div>
