@@ -9,7 +9,7 @@ export default function ChatBox({ messages }) {
     <div
       className="flex flex-col gap-4 p-6 overflow-y-auto custom-scrollbar"
       style={{
-        height: "calc(100vh - 280px)",
+        height: "calc(100vh - 260px)",
       }}
     >
       {messages.map((msg, i) => (

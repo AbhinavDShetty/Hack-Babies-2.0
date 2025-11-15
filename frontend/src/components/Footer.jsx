@@ -11,10 +11,10 @@ export default function Footer() {
         {/* Branding */}
         <div className="flex flex-col items-center">
           <h2 className="text-xl font-semibold text-white mb-3 tracking-wide">
-            Chemistry Visualizer
+            Moleculens.
           </h2>
           <p className="text-white/60 text-sm leading-relaxed">
-            3D molecular exploration powered by AI — visualize, animate and understand
+            3D molecular exploration powered by AI. Visualize, Animate and Understand
             structures like never before.
           </p>
 
@@ -40,8 +40,6 @@ export default function Footer() {
           <ul className="flex flex-col gap-2 text-white/70 text-sm">
             <li><a className="hover:text-white transition" href="#">3D Viewer</a></li>
             <li><a className="hover:text-white transition" href="#">AI Modeling</a></li>
-            <li><a className="hover:text-white transition" href="#">Templates</a></li>
-            <li><a className="hover:text-white transition" href="#">Chemistry Tools</a></li>
           </ul>
         </div>
 
@@ -52,9 +50,7 @@ export default function Footer() {
           </h3>
           <ul className="flex flex-col gap-2 text-white/70 text-sm">
             <li><a className="hover:text-white transition" href="#">Documentation</a></li>
-            <li><a className="hover:text-white transition" href="#">Help Center</a></li>
             <li><a className="hover:text-white transition" href="#">API Reference</a></li>
-            <li><a className="hover:text-white transition" href="#">Developer Tools</a></li>
           </ul>
         </div>
 

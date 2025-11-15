@@ -379,32 +379,30 @@ export default function App() {
         {/* ---------------- HOME MODE ---------------- */}
         {mode === "home" && (
           <>
-            {/* Landing hero with diagonal wipe handled internally */}
-            <Landing3D />
+              {/* Landing hero with diagonal wipe handled internally */}
+              <Landing3D />
 
-            {/* HomeGrid placed below the hero. paddingTop ensures it starts after hero. */}
-            <div
-              id="home-grid"
-              className="relative z-50 w-screen"
-              style={{ paddingTop: "100vh" }}
-            >
-              <HomeGrid onSelectModel={handleTemplateSelect} userId={userId} />
-              <Footer />
-            </div>
-
-            {/* Floating Input — visible ONLY in Landing3D */}
-            {!hideInput && (
-              <div className="z-[600] fixed bottom-6 left-1/2 -translate-x-1/2 w-full max-w-xl px-4 pointer-events-none">
-                <div className="pointer-events-auto">
-                  <InputBar
-                    prompt={prompt}
-                    setPrompt={setPrompt}
-                    handleSubmit={handleSubmit}
-                    loading={loading}
-                  />
-                </div>
+              {/* HomeGrid placed below the hero. paddingTop ensures it starts after hero. */}
+              <div
+                id="home-grid"
+                className="relative z-50 w-screen"
+                style={{ paddingTop: "100vh" }}
+              >
+                <HomeGrid onSelectModel={handleTemplateSelect} userId={userId} />
+                <Footer />
               </div>
-            )}
+
+            {/* Floating input at bottom (home) */}
+            <div className="z-200 fixed bottom-6 left-1/2 -translate-x-1/2 w-full max-w-xl px-4 pointer-events-none">
+              <div className="pointer-events-auto">
+                <InputBar
+                  prompt={prompt}
+                  setPrompt={setPrompt}
+                  handleSubmit={handleSubmit}
+                  loading={loading}
+                />
+              </div>
+            </div>
           </>
         )}
 
@@ -416,11 +414,11 @@ export default function App() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
             >
-              <div className="relative flex flex-col h-[85vh] overflow-hidden flex-1 min-w-200 w-300 mt-6 top-16 items-center">
+              <div className="relative flex flex-col h-[calc(100vh-3rem)] overflow-hidden flex-1 min-w-200 w-300 mt-6 top-16 items-center">
                 <div className="flex-1 overflow-y-auto p-4 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.15)] rounded-t-2xl">
                   <ChatBox messages={chatHistory} />
                 </div>
-                <div className="absolute bottom-2 flex justify-center flex-col items-center border-[rgba(255,255,255,0.15)] p-2 w-[calc(100%-120px)] min-w-[350px]">
+                <div className="absolute bottom-2 flex justify-center flex-col items-center border-[rgba(255,255,255,0.15)] p-2 pb-16 w-[calc(100%-120px)] min-w-[350px]">
                   <InputBar
                     prompt={prompt}
                     setPrompt={setPrompt}
@@ -508,11 +506,10 @@ export default function App() {
                               setCurrentModelIndex(idx);
                               setModelUrl(`${API_BASE}${m.modelUrl}`);
                             }}
-                            className={`w-14 h-14 rounded-xl object-cover cursor-pointer border-2 transition-all ${
-                              idx === currentModelIndex
-                                ? "border-blue-400 scale-105"
-                                : "border-transparent opacity-80 hover:opacity-100"
-                            }`}
+                            className={`w-14 h-14 rounded-xl object-cover cursor-pointer border-2 transition-all ${idx === currentModelIndex
+                              ? "border-blue-400 scale-105"
+                              : "border-transparent opacity-80 hover:opacity-100"
+                              }`}
                           />
                         ))}
                       </div>
