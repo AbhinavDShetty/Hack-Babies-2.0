@@ -20,7 +20,6 @@ import InputBar from "./components/InputBar";
 import BackButton from "./components/BackButton";
 import Footer from "./components/Footer";
 
-
 import "./App.css";
 
 /**
@@ -71,6 +70,17 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [hideInput, setHideInput] = useState(false);
+
+  useEffect(() => {
+    const checkScroll = () => {
+      const heroHeight = window.innerHeight * 0.08; // threshold
+      setHideInput(window.scrollY > heroHeight);
+    };
+
+    window.addEventListener("scroll", checkScroll);
+    return () => window.removeEventListener("scroll", checkScroll);
+  }, []);
 
   // split viewer state
   const [viewerCollapsed, setViewerCollapsed] = useState(false);
@@ -382,17 +392,19 @@ export default function App() {
               <Footer />
             </div>
 
-            {/* Floating input at bottom (home) */}
-            <div className="z-200 fixed bottom-6 left-1/2 -translate-x-1/2 w-full max-w-xl px-4 pointer-events-none">
-              <div className="pointer-events-auto">
-                <InputBar
-                  prompt={prompt}
-                  setPrompt={setPrompt}
-                  handleSubmit={handleSubmit}
-                  loading={loading}
-                />
+            {/* Floating Input — visible ONLY in Landing3D */}
+            {!hideInput && (
+              <div className="z-[600] fixed bottom-6 left-1/2 -translate-x-1/2 w-full max-w-xl px-4 pointer-events-none">
+                <div className="pointer-events-auto">
+                  <InputBar
+                    prompt={prompt}
+                    setPrompt={setPrompt}
+                    handleSubmit={handleSubmit}
+                    loading={loading}
+                  />
+                </div>
               </div>
-            </div>
+            )}
           </>
         )}
 
