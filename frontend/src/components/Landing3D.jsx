@@ -84,16 +84,18 @@ export default function Landing3D() {
 
         {/* TEXT */}
         <div className="absolute top-[22vh] left-20 z-200 select-none max-w-xl">
-          <h1
-            className="font-extrabold leading-tight text-white"
-            style={{ fontSize: "clamp(3.5rem, 5vw, 6rem)" }}
-          >
-            Explore <br /> Secrets of Matter
-          </h1>
+          <div className="flex flex-col items-start text-left space-y-4">
+            <h1
+              className="font-extrabold leading-[1.05] text-white"
+              style={{ fontSize: "clamp(3.5rem, 5vw, 6rem)" }}
+            >
+              Explore <br /> Secrets of Matter
+            </h1>
 
-          <p className="mt-6 text-lg text-white/70 max-w-md">
-            Visualize and interact with molecular structures
-          </p>
+            <p className="text-lg text-white/70 max-w-md">
+              Visualize and interact with molecular structures
+            </p>
+          </div>
         </div>
 
         {/* DNA MODEL */}
