@@ -332,21 +332,15 @@ export default function App() {
       console.warn("No chat for template:", err);
     }
 
-    // fallback: put description in chat
     setChatHistory([{ sender: "bot", text: item.description }]);
   };
 
-  /* ----------------------
-     Derived / memoized values
-     ---------------------- */
   const currentAtomData = useMemo(
     () => activeModels[currentModelIndex]?.atom_data || [],
     [activeModels, currentModelIndex]
   );
 
-  /* ----------------------
-     When user navigates back to home, clear model/chat state
-     ---------------------- */
+
   useEffect(() => {
     if (mode === "home") {
       setChatHistory([]);
@@ -375,18 +369,29 @@ export default function App() {
 
         {(mode === "chat" || mode === "model") && (
           <>
-            {/* BACKGROUND */}
-            <div
-              className="absolute inset-0 bg-cover bg-center"
-              style={{
-                backgroundImage: `url(${heroBg})`,
-                filter: "blur(3px)",
-                transform: "scale(1.08)",
-              }}
-            ></div>
+            {/* FULLSCREEN FIXED BACKGROUND */}
+            <div className="fixed inset-0 w-screen h-screen z-0 pointer-events-none">
+
+              {/* Background image */}
+              <div
+                className="absolute inset-0 bg-cover bg-center"
+                style={{
+                  backgroundImage: `url(${heroBg})`,
+                  filter: "blur(4px)",
+                  transform: "scale(1.12)",
+                }}
+              ></div>
+
+              {/* Dark overlay */}
+              <div className="absolute inset-0 bg-black/60"></div>
+            </div>
+
+            {/* Back button stays above */}
             <BackButton onClick={() => setMode("home")} />
           </>
         )}
+
+
 
         {/* ---------------- HOME MODE ---------------- */}
         {mode === "home" && (
@@ -397,7 +402,7 @@ export default function App() {
             {/* HomeGrid placed below the hero. paddingTop ensures it starts after hero. */}
             <div
               id="home-grid"
-              className="relative z-50 w-screen"
+              className="relative z-60 w-screen"
               style={{ marginTop: "100vh" }}
             >
               <HomeGrid onSelectModel={handleTemplateSelect} userId={userId} />
@@ -520,11 +525,10 @@ export default function App() {
                               setCurrentModelIndex(idx);
                               setModelUrl(`${API_BASE}${m.modelUrl}`);
                             }}
-                            className={`w-14 h-14 rounded-xl object-cover cursor-pointer border-2 transition-all ${
-                              idx === currentModelIndex
-                                ? "border-blue-400 scale-105"
-                                : "border-transparent opacity-80 hover:opacity-100"
-                            }`}
+                            className={`w-14 h-14 rounded-xl object-cover cursor-pointer border-2 transition-all ${idx === currentModelIndex
+                              ? "border-blue-400 scale-105"
+                              : "border-transparent opacity-80 hover:opacity-100"
+                              }`}
                           />
                         ))}
                       </div>
