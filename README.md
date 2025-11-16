@@ -1,18 +1,18 @@
-# 🧬 **MolecuLens — AI-Powered Molecular Visualization & Chemistry Assistant**
+# **Hack-Babies Presents - 🧬 Moleculens**
 
 _A next-generation platform for interactive 3D molecular generation, visualization, and explanation — built with AI, React, Django, and Three.js._
 
 ---
 
-## 📖 **Table of Contents**
+## **Table of Contents**
 
 1. [Overview](#-overview)
 2. [Key Features](#-key-features)
-3. [Prerequisites](#-prerequisites)
+3. [Prerequisites](#prerequisites)
 4. [Usage](#-usage)
 5. [Project Structure](#-project-structure)
 6. [Screenshots](#-screenshots)
-7. [Tech Stack](#-tech-stack)
+7. [Tech-Stack](#tech-stack)
 8. [System Architecture](#-system-architecture)
 9. [Setup Guide](#-setup-guide)
 10. [Acknowledgements](#-acknowledgements)
@@ -21,7 +21,7 @@ _A next-generation platform for interactive 3D molecular generation, visualizati
 
 # 🧭 Overview
 
-# Moleculens — AI‑Powered Molecular Visualization & Reaction Animator
+# Moleculens — AI‑Powered Molecular Visualization Platform
 
 Moleculens is an end‑to‑end chemistry platform that allows users to:
 
@@ -30,33 +30,31 @@ Moleculens is an end‑to‑end chemistry platform that allows users to:
 - Automatically generate atom‑level metadata for color legends
 - Maintain multi‑message chat sessions with persistent history
 - Explore a library of prebuilt molecules with thumbnails
-- View a cinematic 3D landing page with scroll‑triggered diagonal‑wipe transition
+- View a cinematic 3D landing page
 
 ---
 
 ## 🌐 Key Features
+ - Hero Landing Section
 
-### ✔ Hero Landing Section
+ - AI-powered molecule generation from text prompts
 
-🧠 AI-powered molecule generation from text prompts
+ - 3D molecule viewer using Three.js + GLTF
 
-🧬 3D molecule viewer using Three.js + GLTF
+ - Chat system with saved sessions
 
-💬 Chat system with saved sessions
+ - Automatic GLB model generation + thumbnails
 
-📁 Automatic GLB model generation + thumbnails
+ - Full-stack setup using Django REST API + React frontend
 
-🌐 Full-stack setup using Django REST API + React frontend
+ - Modern UI with glass morphism, and dynamic layout switching
 
-🎨 Modern UI with glass morphism, and dynamic layout switching
+ - Session persistence, pinning, and deletion
 
-📚 Session persistence, pinning, and deletion
-
-🖥️ Split-pane model + chat mode
-
+ - Split-pane model + chat mode
 ---
 
-## 🧱 Prerequisites
+## Prerequisites
 
 Before installing, ensure you have:
 
@@ -140,45 +138,48 @@ src/
 ```
 backend/
  ├─ api/
- │   ├─ generate-model/        → Generate GLB + thumbnail + metadata
- │   ├─ chats/                 → Fetch user chat sessions
- │   ├─ chat/<id>/             → Retrieve a full chat (messages + models)
- │   ├─ chat/<id>/delete/      → Delete a session
- │   ├─ model-chat/            → Lookup chat by molecule name
- │   └─ templates/             → Prebuilt molecules
+ │   ├─ views.py              → All API endpoints (generate-model, sessions, chat, delete, templates)
+ │   ├─ generator.py          → Model-generation engine (SMILES → RDKit → GLB)
+ │   ├─ vector_search.py      → RAG + semantic search + PubChem fallback
+ │   ├─ llm_client.py         → LLM communication wrapper (Ollama/OpenAI)
+ │   ├─ urls.py               → API route definitions
+ |   ├─ serializers.py
+ │   └─ models.py             → Django DB models (ChatSession, ModelTemplate, ChatMessage, etc.)
  │
- ├─ storage/
- │   ├─ glb/
- │   ├─ thumbnails/
- │   └─ sessions/
+ ├─ media/
+ │   ├─ models/               → Auto-generated GLB molecules
+ │   └─ thumbnails/           → Auto-generated PNG thumbnails
  │
- ├─ tools/
- │   ├─ ModelGenerator.py      → SMILES → 3D GLB
- │   ├─ ThumbnailBuilder.py    → Renders GLB to PNG
- │   └─ AtomExtractor.py       → Outputs element‑color metadata
- │
- └─ manage.py
+ ├─ db.sqlite3                → SQLite database
+ ├─ manage.py                 → Django management script
+ └─ requirements.txt
 ```
 
 ---
 
-## 📷 Screenshot
+## 📷 Screenshots
 
+ # HomePage
 ![HomePage](screenshots/HomePage.png)
+# HomeGrid
 ![HomeGrid](screenshots/HomeGrid.png)
+# SideBar
 ![SideBar](screenshots/SideBar.png)
+# 3D Model View
 ![TNT-Molecule](screenshots/TNTMolecule.png)
 
 ---
 
-## 🛠️ Tech Stack
+## Tech-Stack
 
-Backend
+Backend:
 
 - Django / Django REST Framework
 - RDKit (molecule generation)
 - Python 3.10+
-- Frontend
+
+Frontend:
+
 - React + Vite
 - TailwindCSS
 - Three.js
@@ -190,22 +191,23 @@ Backend
 ## 🧩 System Architecture
 
 ![FlowChart1](screenshots/Flowchart-1.png)
+# 
 ![FlowChart2](screenshots/Flowchart-2.png)
 
 ---
 
 ## 🚀 Setup Guide
 
-### ✅ Step 1 — Clone the Repository
+### Step 1 — Clone the Repository
 
 ```bash
 git clone https://github.com/AbhinavDShetty/Hack-Babies-2.0.git
 cd Hack-Babies-2.0
 ```
 
-### 🐍 2. Backend Setup (Django + RDKit)
+### 2. Backend Setup (Django + RDKit)
 
-#### ▶️ Step 2.1 — Create a Virtual Environment
+#### Step 2.1 — Create a Virtual Environment
 
 ```bash
 cd backend
@@ -226,19 +228,19 @@ venv\Scripts\activate
 source venv/bin/activate
 ```
 
-#### ▶️ Step 2.2 — Install Dependencies
+#### Step 2.2 — Install Dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-#### ▶️ Step 2.3 — Run Migrations
+#### Step 2.3 — Run Migrations
 
 ```bash
 python manage.py migrate
 ```
 
-#### ▶️ Step 2.4 — Run Backend Server
+#### Step 2.4 — Run Backend Server
 
 ```bash
 python manage.py runserver
@@ -248,16 +250,16 @@ If successful, the backend should run at:
 
 👉 http://127.0.0.1:8000/
 
-### ⚛️ 3. Frontend Setup (React + Vite)
+### 3. Frontend Setup (React + Vite)
 
-#### ▶️ Step 3.1 — Install Node Module
+#### Step 3.1 — Install Node Module
 
 ```bash
 cd frontend
 npm install
 ```
 
-#### ▶️ Step 3.2 — Run the Frontend
+#### Step 3.2 — Run the Frontend
 
 ```bash
 npm run dev
