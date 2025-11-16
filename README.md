@@ -14,7 +14,8 @@ _A next-generation platform for interactive 3D molecular generation, visualizati
 6. [Screenshots](#-screenshots)
 7. [Tech Stack](#-tech-stack)
 8. [System Architecture](#-system-architecture)
-9. [Setup Guide](#-setup-guide) 10.[Acknowledgements](#-acknowledgements)
+9. [Setup Guide](#-setup-guide)
+10. [Acknowledgements](#-acknowledgements)
 
 ---
 
@@ -166,6 +167,7 @@ backend/
 ![HomePage](screenshots/HomePage.png)
 ![HomeGrid](screenshots/HomeGrid.png)
 ![SideBar](screenshots/SideBar.png)
+![TNT-Molecule](screenshots/TNTMolecule.png)
 
 ---
 

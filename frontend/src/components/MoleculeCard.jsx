@@ -1,6 +1,25 @@
 import React from "react";
+import { X } from "lucide-react"; // Optional: nice icon
 
-export default function MoleculeCard({ item, onSelect }) {
+export default function MoleculeCard({ item, onSelect, userId, onDelete }) {
+
+  // DELETE HANDLER
+  const handleDelete = async (e) => {
+    e.stopPropagation(); // prevent triggering onSelect
+    try {
+      const res = await fetch(
+        `http://127.0.0.1:8000/api/user/${userId}/models/delete/${item.id}/`,
+        { method: "DELETE" }
+      );
+
+      if (!res.ok) throw new Error("Delete failed");
+      if (onDelete) onDelete(item.id); // callback to parent to refresh UI
+
+    } catch (err) {
+      console.error("Delete error:", err);
+    }
+  };
+
   return (
     <div
       onClick={() => onSelect(item)}
@@ -21,6 +40,29 @@ export default function MoleculeCard({ item, onSelect }) {
       "
       style={{ aspectRatio: "4/3" }}
     >
+      {/* ---- DELETE BUTTON ---- */}
+      <button
+        onClick={handleDelete}
+        className="
+          absolute top-2 right-2 z-30
+          opacity-0 group-hover/card:opacity-100
+          transition-all duration-300
+
+          bg-[rgba(255,40,40,0.25)]
+          hover:bg-[rgba(255,40,40,0.45)]
+          border border-red-400/40
+          backdrop-blur-md
+          text-white
+          w-8 h-8 rounded-full
+
+          flex items-center justify-center
+          hover:scale-110 active:scale-95
+          shadow-[0_0_10px_rgba(255,0,0,0.45)]
+        "
+      >
+        <X size={16} />
+      </button>
+
       {/* FULL COVER IMAGE */}
       <img
         src={`http://127.0.0.1:8000${item.thumbnail}`}

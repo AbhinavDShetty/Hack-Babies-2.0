@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import MoleculeCard from "./MoleculeCard";
 
-export default function HomeGrid({ onSelectModel }) {
+export default function HomeGrid({ onSelectModel, userId }) {
   const [data, setData] = useState({});
   const [loading, setLoading] = useState(true);
 
@@ -102,12 +102,12 @@ export default function HomeGrid({ onSelectModel }) {
       observers.forEach((ro) => {
         try {
           ro.disconnect();
-        } catch (e) {}
+        } catch (e) { }
       });
       timers.forEach((t) => {
         try {
           clearTimeout(t);
-        } catch (e) {}
+        } catch (e) { }
       });
     };
   }, [data, expanded]);
@@ -199,7 +199,17 @@ export default function HomeGrid({ onSelectModel }) {
                     >
                       {items.map((item, i) => (
                         <div key={i}>
-                          <MoleculeCard item={item} onSelect={onSelectModel} />
+                          <MoleculeCard
+                            item={item}
+                            onSelect={onSelectModel}
+                            userId={userId}
+                            onDelete={(id) => {
+                              setData((prev) => ({
+                                ...prev,
+                                custom: prev.custom.filter((m) => m.id !== id)
+                              }));
+                            }}
+                          />
                         </div>
                       ))}
                     </motion.div>
@@ -229,7 +239,17 @@ export default function HomeGrid({ onSelectModel }) {
                       >
                         {loopItems.map((item, i) => (
                           <div key={i} className="snap-center shrink-0 w-[280px]">
-                            <MoleculeCard item={item} onSelect={onSelectModel} />
+                            <MoleculeCard
+                              item={item}
+                              onSelect={onSelectModel}
+                              userId={userId}
+                              onDelete={(id) => {
+                                setData((prev) => ({
+                                  ...prev,
+                                  custom: prev.custom.filter((m) => m.id !== id)
+                                }));
+                              }}
+                            />
                           </div>
                         ))}
                       </div>
