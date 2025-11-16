@@ -40,7 +40,9 @@ export default function ThreeViewer({ modelPath, atomData = [] }) {
       camera.position.set(2, 1, 8);
 
       const pmrem = new THREE.PMREMGenerator(renderer);
-      scene.environment = pmrem.fromScene(new RoomEnvironment(renderer)).texture;
+      scene.environment = pmrem.fromScene(
+        new RoomEnvironment(renderer)
+      ).texture;
 
       scene.add(new THREE.AmbientLight(0xffffff, 2.8));
 
@@ -172,7 +174,9 @@ export default function ThreeViewer({ modelPath, atomData = [] }) {
           <h3 className="text-sm font-semibold mb-2">Atoms</h3>
           <div className="flex flex-wrap gap-2">
             {uniqueElements.map(([symbol, colorArr]) => {
-              const bg = `rgb(${colorArr.map((v) => Math.round(v * 255)).join(",")})`;
+              const bg = `rgb(${colorArr
+                .map((v) => Math.round(v * 255))
+                .join(",")})`;
               const textColor = getContrastColor(colorArr);
               return (
                 <div

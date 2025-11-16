@@ -7,36 +7,24 @@ import DNAModel from "./DNAModel";
 import LockedControls from "./LockedControls";
 import heroBg from "../assets/hero_bg.jpg";
 
-/* ---------------------------------------------------------
-   CONSTANTS
---------------------------------------------------------- */
-const SCROLL_MAX = 600; // Pixels until full reveal
-const BLUR_MAX = 10; // Max blur
-const LIFT_MAX = 60; // Max upward shift
-const MASK_MOVE = 140; // % the mask travels
-const MASK_ROTATION = -30; // Rotation of mask rectangle
+const SCROLL_MAX = 600;
+const BLUR_MAX = 10;
+const LIFT_MAX = 60;
 
 export default function Landing3D() {
   const [scrollY, setScrollY] = useState(0);
 
-  /* Track scroll safely */
   useEffect(() => {
     const handleScroll = () => setScrollY(window.scrollY);
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  /* Normalized scroll progress 0 → 1 */
   const p = Math.min(scrollY / SCROLL_MAX, 1);
 
-  /* Derived visual transforms */
   const fade = 1 - p * 0.65;
   const blur = p * BLUR_MAX;
   const lift = p * LIFT_MAX;
-
-  /* Diagonal wipe mask movement */
-  const maskX = 50 - p * MASK_MOVE;
-  const maskY = -50 + p * MASK_MOVE;
 
   return (
     <section
@@ -47,37 +35,48 @@ export default function Landing3D() {
         transform: `translateY(-${lift}px)`,
         transition:
           "opacity .18s linear, filter .18s linear, transform .18s linear",
-        pointerEvents: fade < 0.12 ? "none" : "auto",
+        pointerEvents: fade < 0.1 ? "none" : "auto",
         zIndex: 50,
       }}
     >
-      {/* Background image */}
+      {/* BACKGROUND */}
       <div
         className="absolute inset-0 bg-cover bg-center"
-        style={{ backgroundImage: `url(${heroBg})` }}
+        style={{
+          backgroundImage: `url(${heroBg})`,
+          filter: "blur(3px)",
+          transform: "scale(1.08)",
+        }}
       />
 
-      {/* Contrast enhancement overlay */}
       <div className="absolute inset-0 bg-[rgba(10,10,12,0.25)]" />
 
-      {/* DIAGONAL WIPE MASK */}
+      {/* DIAGONAL MASK — fully covers screen and stays black */}
       <div className="absolute inset-0 pointer-events-none z-[140] overflow-hidden">
         <div
           style={{
             position: "absolute",
-            width: "220%",
-            height: "220%",
-            left: "-60%",
-            top: "-60%",
-            background: "rgba(0,0,0,0.75)",
-            transform: `translate(${maskX}%, ${maskY}%) rotate(${MASK_ROTATION}deg)`,
-            transformOrigin: "50% 50%",
+            width: "400%", // HUGE — guarantees full cover even after rotation
+            height: "400%",
+            left: "-300%", // start FAR bottom-left
+            top: "80%",
+
+            background: "rgba(0,0,0,0.92)", // deep black
+
+            // movement (clamped so it stops and stays)
+            transform: `translate(
+        ${Math.min(p * 260, 260)}%, 
+        ${-Math.min(p * 260, 260)}%
+      ) rotate(45deg)`,
+
+            transformOrigin: "center",
+            transition: "transform 0.8s linear",
           }}
         />
       </div>
 
-      {/* HERO TEXT */}
-      <div className="absolute top-[22vh] left-20 z-200 select-none max-w-xl flex flex-col items-center pointer-events-none">
+      {/* TEXT */}
+      <div className="absolute top-[22vh] left-20 z-200 select-none max-w-xl">
         <h1
           className="font-extrabold leading-tight text-white"
           style={{ fontSize: "clamp(3.5rem, 5vw, 6rem)" }}
@@ -85,12 +84,12 @@ export default function Landing3D() {
           Explore <br /> Secrets of Matter
         </h1>
 
-        <p className="mt-6 text-lg text-white/70 max-w-md text-center">
+        <p className="mt-6 text-lg text-white/70 max-w-md">
           Visualize and interact with molecular structures
         </p>
       </div>
 
-      {/* 3D DNA VIEWER */}
+      {/* DNA */}
       <div className="absolute right-0 top-0 h-full w-[50%] z-150 pointer-events-none">
         <Canvas
           gl={{ alpha: true }}

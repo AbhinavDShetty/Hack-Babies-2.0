@@ -19,6 +19,7 @@ import ChatBox from "./components/ChatBox";
 import InputBar from "./components/InputBar";
 import BackButton from "./components/BackButton";
 import Footer from "./components/Footer";
+import heroBg from "./assets/hero_bg.jpg";
 
 import "./App.css";
 
@@ -373,7 +374,18 @@ export default function App() {
         <Header />
 
         {(mode === "chat" || mode === "model") && (
-          <BackButton onClick={() => setMode("home")} />
+          <>
+            {/* BACKGROUND */}
+            <div
+              className="absolute inset-0 bg-cover bg-center"
+              style={{
+                backgroundImage: `url(${heroBg})`,
+                filter: "blur(3px)",
+                transform: "scale(1.08)",
+              }}
+            ></div>
+            <BackButton onClick={() => setMode("home")} />
+          </>
         )}
 
         {/* ---------------- HOME MODE ---------------- */}
@@ -508,10 +520,11 @@ export default function App() {
                               setCurrentModelIndex(idx);
                               setModelUrl(`${API_BASE}${m.modelUrl}`);
                             }}
-                            className={`w-14 h-14 rounded-xl object-cover cursor-pointer border-2 transition-all ${idx === currentModelIndex
-                              ? "border-blue-400 scale-105"
-                              : "border-transparent opacity-80 hover:opacity-100"
-                              }`}
+                            className={`w-14 h-14 rounded-xl object-cover cursor-pointer border-2 transition-all ${
+                              idx === currentModelIndex
+                                ? "border-blue-400 scale-105"
+                                : "border-transparent opacity-80 hover:opacity-100"
+                            }`}
                           />
                         ))}
                       </div>
