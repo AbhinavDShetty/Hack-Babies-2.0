@@ -57,7 +57,7 @@ export default function HomeGrid({ onSelectModel, userId }) {
                 {/* CATEGORY HEADER */}
                 <div className="flex items-center justify-between mb-8">
                   <h3 className="text-3xl font-bold text-white">
-                    {category === "custom" ? "My Creations" : category}
+                    {category === "custom" ? "My Creations" : category.charAt(0).toUpperCase() + category.slice(1)}
                   </h3>
 
                   {hasMore && (

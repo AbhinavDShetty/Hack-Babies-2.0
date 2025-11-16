@@ -1,6 +1,5 @@
 import React from "react";
 import { motion } from "framer-motion";
-import { Menu } from "lucide-react";
 
 export default function Header({ onSidebarToggle }) {
   return (
@@ -13,7 +12,7 @@ export default function Header({ onSidebarToggle }) {
           fixed 
           top-0 
           left-0 
-          z-[200]   // ⬅ SUPER HIGH
+          z-200   // ⬅ SUPER HIGH
           py-4
           h-20
           bg-[rgba(255, 255, 255, 0.03)]
@@ -33,7 +32,17 @@ export default function Header({ onSidebarToggle }) {
             drop-shadow-lg
           "
         >
-          Moleculens.
+          Moleculens<span
+            className="
+              bg-linear-to-r 
+              from-[#7b4dff] 
+              to-[#c084fc] 
+              bg-clip-text 
+              text-transparent
+            "
+          >
+            .
+          </span>
         </div>
       </motion.div>
     </>

@@ -386,7 +386,7 @@ export default function App() {
               <div
                 id="home-grid"
                 className="relative z-50 w-screen"
-                style={{ paddingTop: "100vh" }}
+                style={{ marginTop: "100vh" }}
               >
                 <HomeGrid onSelectModel={handleTemplateSelect} userId={userId} />
                 <Footer />
