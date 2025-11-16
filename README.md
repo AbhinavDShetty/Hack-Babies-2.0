@@ -6,20 +6,20 @@ _A next-generation platform for interactive 3D molecular generation, visualizati
 
 ## **Table of Contents**
 
-1. [Overview](#-overview)
-2. [Key Features](#-key-features)
+1. [Overview](#overview)
+2. [Key Features](#key-features)
 3. [Prerequisites](#prerequisites)
-4. [Usage](#-usage)
-5. [Project Structure](#-project-structure)
-6. [Screenshots](#-screenshots)
+4. [Usage](#usage)
+5. [Project Structure](#project-structure)
+6. [Screenshots](#screenshots)
 7. [Tech-Stack](#tech-stack)
-8. [System Architecture](#-system-architecture)
-9. [Setup Guide](#-setup-guide)
-10. [Acknowledgements](#-acknowledgements)
+8. [System Architecture](#system-architecture)
+9. [Setup Guide](#setup-guide)
+10. [Acknowledgements](#acknowledgements)
 
 ---
 
-# 🧭 Overview
+# Overview
 
 # Moleculens — AI‑Powered Molecular Visualization Platform
 
@@ -34,7 +34,7 @@ Moleculens is an end‑to‑end chemistry platform that allows users to:
 
 ---
 
-## 🌐 Key Features
+## Key Features
  - Hero Landing Section
 
  - AI-powered molecule generation from text prompts
@@ -64,6 +64,9 @@ Before installing, ensure you have:
 - pip
 - Conda (recommended for RDKit)
 - RDKit (`conda install -c conda-forge rdkit`)
+- ollama
+- gpt-oss:20b model(`ollama run gpt-oss:20b`)
+- llama3:8b model (`ollama run llama3:8b`)
 
 **Frontend**
 
@@ -72,7 +75,7 @@ Before installing, ensure you have:
 
 ---
 
-## 🚀 Usage
+## Usage
 
 **Home Page**
 
@@ -104,7 +107,7 @@ Before installing, ensure you have:
 
 ---
 
-## 🏗 Project Structure
+## Project Structure
 
 ---
 
@@ -157,7 +160,7 @@ backend/
 
 ---
 
-## 📷 Screenshots
+## Screenshots
 
  # HomePage
 ![HomePage](screenshots/HomePage.png)
@@ -188,7 +191,7 @@ Frontend:
 
 ---
 
-## 🧩 System Architecture
+## System Architecture
 
 ![FlowChart1](screenshots/Flowchart-1.png)
 # 
@@ -196,7 +199,7 @@ Frontend:
 
 ---
 
-## 🚀 Setup Guide
+## Setup Guide
 
 ### Step 1 — Clone the Repository
 
@@ -234,13 +237,7 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-#### Step 2.3 — Run Migrations
-
-```bash
-python manage.py migrate
-```
-
-#### Step 2.4 — Run Backend Server
+#### Step 2.3 — Run Backend Server
 
 ```bash
 python manage.py runserver
@@ -248,7 +245,7 @@ python manage.py runserver
 
 If successful, the backend should run at:
 
-👉 http://127.0.0.1:8000/
+http://127.0.0.1:8000/
 
 ### 3. Frontend Setup (React + Vite)
 
@@ -267,9 +264,9 @@ npm run dev
 
 Your frontend will run at:
 
-👉 http://localhost:5173/
+http://localhost:5173/
 
-### 🔗 4. Connecting Frontend & Backend
+### 4. Connecting Frontend & Backend
 
 Ensure your frontend API base is set correctly:
 
@@ -284,16 +281,17 @@ Backend CORS should allow frontend:
 ```bash
 CORS_ALLOW_ALL_ORIGINS = True
 ```
+# 
 
-### 🧪 5. Using the Application
+### 5. Using the Application
 
-#### 🎯 Home Page
+#### Home Page
 
 - Scroll through molecule presets
 - Click a molecule card to view its 3D model
 - Or use the input bar to ask for any molecule ("generate methane", "show aspirin", etc.)
 
-#### 🧬 3D Model Mode
+#### 3D Model Mode
 
 - Drag to rotate
 - Scroll to zoom
@@ -301,14 +299,14 @@ CORS_ALLOW_ALL_ORIGINS = True
 - Atom list displays colors + symbols
 - Load previous generated models from the thumbnails bar
 
-#### 🗨️ Chat Mode
+#### Chat Mode
 
 - Ask chemistry questions
 - Models and explanations are automatically saved
 - Sessions appear in the sidebar
 - You can pin, delete, or reopen chats
 
-#### 📁 Saved Models
+#### Saved Models
 
 - Every generated molecule is saved as:
   - .glb model
@@ -316,7 +314,7 @@ CORS_ALLOW_ALL_ORIGINS = True
   - Chat session
 - Re-open instantly anytime
 
-### 🧹 6. Resetting the Project
+### 6. Resetting the Project
 
 To wipe previous models & chats:
 
@@ -340,7 +338,7 @@ python manage.py migrate
 
 ---
 
-## 🙏 Acknowledgements
+## Acknowledgements
 
 Special thanks to:
 
@@ -351,7 +349,7 @@ Special thanks to:
 
 ---
 
-## 🎉 You're Ready!
+## You're Ready!
 
 You have fully configured Moleculens.
 Start generating molecules, exploring structures, and chatting with AI chemistry.
