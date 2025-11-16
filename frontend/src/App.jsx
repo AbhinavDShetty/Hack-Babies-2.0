@@ -379,30 +379,32 @@ export default function App() {
         {/* ---------------- HOME MODE ---------------- */}
         {mode === "home" && (
           <>
-              {/* Landing hero with diagonal wipe handled internally */}
-              <Landing3D />
+            {/* Landing hero with diagonal wipe handled internally */}
+            <Landing3D />
 
-              {/* HomeGrid placed below the hero. paddingTop ensures it starts after hero. */}
-              <div
-                id="home-grid"
-                className="relative z-50 w-screen"
-                style={{ marginTop: "100vh" }}
-              >
-                <HomeGrid onSelectModel={handleTemplateSelect} userId={userId} />
-                <Footer />
-              </div>
+            {/* HomeGrid placed below the hero. paddingTop ensures it starts after hero. */}
+            <div
+              id="home-grid"
+              className="relative z-50 w-screen"
+              style={{ marginTop: "100vh" }}
+            >
+              <HomeGrid onSelectModel={handleTemplateSelect} userId={userId} />
+              <Footer />
+            </div>
 
             {/* Floating input at bottom (home) */}
-            <div className="z-200 fixed bottom-6 left-1/2 -translate-x-1/2 w-full max-w-xl px-4 pointer-events-none">
-              <div className="pointer-events-auto">
-                <InputBar
-                  prompt={prompt}
-                  setPrompt={setPrompt}
-                  handleSubmit={handleSubmit}
-                  loading={loading}
-                />
+            {!hideInput && (
+              <div className="z-200 fixed bottom-6 left-1/2 -translate-x-1/2 w-full max-w-xl px-4 pointer-events-none">
+                <div className="pointer-events-auto">
+                  <InputBar
+                    prompt={prompt}
+                    setPrompt={setPrompt}
+                    handleSubmit={handleSubmit}
+                    loading={loading}
+                  />
+                </div>
               </div>
-            </div>
+            )}
           </>
         )}
 
