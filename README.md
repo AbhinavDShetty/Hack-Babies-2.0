@@ -15,7 +15,7 @@ _A next-generation platform for interactive 3D molecular generation, visualizati
 7. [Tech Stack](#-tech-stack)
 8. [System Architecture](#-system-architecture)
 9. [Setup Guide](#-setup-guide)
-10. 10.[Acknowledgements](#-acknowledgements)
+10. [Acknowledgements](#-acknowledgements)
 
 ---
 
