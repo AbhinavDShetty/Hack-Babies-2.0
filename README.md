@@ -187,8 +187,8 @@ Backend
 
 ## 🧩 System Architecture
 
-![FlowChart1](screenshots/FlowChart-1.png)
-![FlowChart2](screenshots/FlowChart-2.png)
+![FlowChart1](screenshots/Flowchart-1.png)
+![FlowChart2](screenshots/Flowchart-2.png)
 
 ---
 
