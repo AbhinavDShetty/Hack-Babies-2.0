@@ -340,7 +340,6 @@ export default function App() {
     [activeModels, currentModelIndex]
   );
 
-
   useEffect(() => {
     if (mode === "home") {
       setChatHistory([]);
@@ -365,13 +364,44 @@ export default function App() {
       />
 
       <div className="meku-theme app-container" ref={containerRef}>
+        {/* DARK OVERLAY FOR CHAT + MODEL MODE */}
+        {(mode === "chat" || mode === "model") && (
+          <div
+            className="fixed inset-0 z-0 pointer-events-none"
+            style={{
+              backgroundImage: `
+      linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.75)),
+      url(${heroBg})
+    `,
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+              backdropFilter: "blur(5px)",
+            }}
+          />
+        )}
+
+        {/* DARK OVERLAY FOR CHAT + MODEL MODE */}
+        {(mode === "chat" || mode === "model") && (
+          <div
+            className="fixed inset-0 z-0 pointer-events-none"
+            style={{
+              backgroundImage: `
+      linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.75)),
+      url(${heroBg})
+    `,
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+              backdropFilter: "blur(5px)",
+            }}
+          />
+        )}
+
         <Header />
 
         {(mode === "chat" || mode === "model") && (
           <>
             {/* FULLSCREEN FIXED BACKGROUND */}
             <div className="fixed inset-0 w-screen h-screen z-0 pointer-events-none">
-
               {/* Background image */}
               <div
                 className="absolute inset-0 bg-cover bg-center"
@@ -390,8 +420,6 @@ export default function App() {
             <BackButton onClick={() => setMode("home")} />
           </>
         )}
-
-
 
         {/* ---------------- HOME MODE ---------------- */}
         {mode === "home" && (
@@ -454,7 +482,7 @@ export default function App() {
         {/* MODEL MODE */}
         {mode === "model" && (
           <motion.div
-            className="model-chat-layout relative h-[calc(100vh-4rem)] px-4 mt-10 rounded-2xl overflow-hidden"
+            className="model-chat-layout relative h-[calc(100vh-4rem)] px-4 mt-17 mb-8 rounded-2xl overflow-hidden"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
           >
@@ -525,10 +553,11 @@ export default function App() {
                               setCurrentModelIndex(idx);
                               setModelUrl(`${API_BASE}${m.modelUrl}`);
                             }}
-                            className={`w-14 h-14 rounded-xl object-cover cursor-pointer border-2 transition-all ${idx === currentModelIndex
-                              ? "border-blue-400 scale-105"
-                              : "border-transparent opacity-80 hover:opacity-100"
-                              }`}
+                            className={`w-14 h-14 rounded-xl object-cover cursor-pointer border-2 transition-all ${
+                              idx === currentModelIndex
+                                ? "border-blue-400 scale-105"
+                                : "border-transparent opacity-80 hover:opacity-100"
+                            }`}
                           />
                         ))}
                       </div>

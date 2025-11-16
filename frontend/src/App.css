@@ -407,3 +407,38 @@ html, body {
     transparent
   );
 }
+
+
+/* SIMPLE MODERN BURGER ANIMATION */
+.burger-btn {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  padding: 4px;
+}
+
+.burger-line {
+  width: 26px;
+  height: 3px;
+  background: #ffffff;
+  border-radius: 6px;
+  transition: 0.25s ease;
+}
+
+/* Hover animation */
+.burger-btn:hover .burger-line:nth-child(1) {
+  transform: translateY(-2px);
+}
+
+.burger-btn:hover .burger-line:nth-child(3) {
+  transform: translateY(2px);
+}
+
+.burger-btn:hover .burger-line:nth-child(2) {
+  width: 18px;
+  opacity: 0.7;
+}

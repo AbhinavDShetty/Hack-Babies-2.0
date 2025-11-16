@@ -11,7 +11,7 @@ const SCROLL_MAX = 600;
 const BLUR_MAX = 10;
 const LIFT_MAX = 60;
 
-const DIAGONAL_PIXELS = 1400;
+const DIAGONAL_PIXELS = 2000;
 
 export default function Landing3D() {
   const [scrollY, setScrollY] = useState(0);
@@ -65,7 +65,8 @@ export default function Landing3D() {
           opacity: fade,
           filter: `blur(${blur}px)`,
           transform: `translateY(-${lift}px)`,
-          transition: "opacity .2s linear, filter .2s linear, transform .2s linear",
+          transition:
+            "opacity .2s linear, filter .2s linear, transform .2s linear",
           zIndex: 50,
         }}
       >
