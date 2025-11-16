@@ -105,7 +105,11 @@ def delete_chat_session(request, chat_id):
             if not chat:
                 return JsonResponse({"error": "Chat not found"}, status=404)
 
-            chat.linked_models.clear()  # remove associations but not models
+            linked_models = list(chat.linked_models.all())
+
+            for model in linked_models:
+                model.delete()
+
             chat.delete()
             return JsonResponse({"success": True})
         except Exception as e:
@@ -247,18 +251,26 @@ def upload_user_model(request, user_id):
         
     
 @csrf_exempt
-def delete_model(request, model_id):
+def delete_model(request, user_id, model_id):
     if request.method == "DELETE":
         try:
             model = ModelTemplate.objects.get(id=model_id)
-            ChatSession.objects.filter(related_model=model).delete()
+
+            for chat in model.chat_sessions.all():
+                chat.linked_models.remove(model)
+
             model.delete()
+
             return JsonResponse({"success": True})
+
         except ModelTemplate.DoesNotExist:
             return JsonResponse({"error": "Model not found"}, status=404)
+
         except Exception as e:
             return JsonResponse({"error": str(e)}, status=500)
+
     return JsonResponse({"error": "Invalid method"}, status=405)
+
 
 def get_user_models(request, user_id):
     models = ModelTemplate.objects.filter(user_id=user_id, category="custom").order_by("-created_at")
@@ -436,6 +448,8 @@ class GenerateModelView(APIView):
                             else None,
                             "chat_id": chat_session.id,
                             "reused": True,
+                            "atoms": existing_match.atom_data,
+                            "bonds": existing_match.bond_data
                         },
                         status=status.HTTP_200_OK,
                     )
@@ -445,7 +459,10 @@ class GenerateModelView(APIView):
             plan = parse_prompt_to_plan(prompt, chat_history)
             reasoning = plan.get("reasoning", "")
 
-            file_path = generate_from_plan(plan)
+            model_data = generate_from_plan(plan)
+            atom_data = model_data.get("atoms", [])
+            bond_data = model_data.get("bonds", [])
+            file_path = model_data["glb_path"]
             media_root = str(settings.MEDIA_ROOT)
             rel_path = os.path.relpath(file_path, media_root)
             model_url = f"{settings.MEDIA_URL}{rel_path.replace(os.sep, '/')}"
@@ -466,6 +483,8 @@ class GenerateModelView(APIView):
                 category="custom",
                 thumbnail=rel_thumb_path,
                 model_file=rel_path,
+                atom_data=atom_data,
+                bond_data=bond_data,
             )
 
             # --- Chat session linking ---
@@ -503,6 +522,8 @@ class GenerateModelView(APIView):
                     "response": plan.get("response", ""),
                     "chat_id": chat_session.id,
                     "reused": False,
+                    "atoms": atom_data,
+                    "bonds": bond_data
                 },
                 status=status.HTTP_200_OK,
             )

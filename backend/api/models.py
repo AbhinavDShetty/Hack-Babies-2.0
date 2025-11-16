@@ -2,6 +2,7 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.db.models.signals import post_delete
 from django.dispatch import receiver
+import os
 
 
 class Note(models.Model):
@@ -91,6 +92,8 @@ class ModelTemplate(models.Model):
     thumbnail = models.ImageField(upload_to='thumbnails/')
     model_file = models.FileField(upload_to='models/')
     created_at = models.DateTimeField(auto_now_add=True)
+    atom_data = models.JSONField(default=list, blank=True)
+    bond_data = models.JSONField(default=list, blank=True)
 
     def __str__(self):
         owner = self.user.username if self.user else "Public"
@@ -106,6 +109,8 @@ class ModelTemplate(models.Model):
             "modelUrl": self.model_file.url if self.model_file else None,
             "user": self.user.username if self.user else None,
             "created_at": self.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+            "atom_data": self.atom_data,
+            "bond_data": self.bond_data,
         }
 
 @receiver(post_delete, sender=ModelTemplate)

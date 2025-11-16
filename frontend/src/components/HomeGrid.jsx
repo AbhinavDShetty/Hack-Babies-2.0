@@ -1,264 +1,275 @@
-// import React, { useState } from "react";
-// import { motion } from "framer-motion";
-
-// const sampleData = {
-//   molecules: [
-//     { name: "Water Molecule", thumb: "/images/molecule1.jpg" },
-//     { name: "Glucose Structure", thumb: "/images/molecule2.jpg" },
-//     { name: "Caffeine Model", thumb: "/images/molecule3.jpg" },
-//     { name: "DNA Helix", thumb: "/images/molecule4.jpg" },
-//     { name: "Ethanol Molecule", thumb: "/images/molecule5.jpg" },
-//     { name: "Aspirin Structure", thumb: "/images/molecule6.jpg" },
-//     { name: "Cholesterol Model", thumb: "/images/molecule7.jpg" },
-//   ],
-//   reactions: [
-//     { name: "Combustion", thumb: "/images/reaction1.jpg" },
-//     { name: "Photosynthesis", thumb: "/images/reaction2.jpg" },
-//     { name: "Acid-Base Reaction", thumb: "/images/reaction3.jpg" },
-//   ],
-//   custom: [
-//     { name: "My Sucrose Blend", thumb: "/images/custom1.jpg" },
-//     { name: "Experiment Model", thumb: "/images/custom2.jpg" },
-//   ],
-// };
-
-// export default function HomeGrid() {
-//   const [expanded, setExpanded] = useState(null);
-
-//   const toggleCategory = (category) => {
-//     setExpanded(expanded === category ? null : category);
-//   };
-
-//   return (
-//     <div className="home-grid-section w-full flex flex-col gap-12 max-w-[1200px] mx-auto">
-//       {Object.entries(sampleData).map(([category, items]) => {
-//         const isExpanded = expanded === category;
-//         const hasMore = items.length > 4;
-
-//         return (
-//           <div key={category} className="w-full relative">
-//             {/* Category Header */}
-//             <motion.div
-//               className="flex justify-between items-center cursor-pointer mb-4 select-none"
-//               onClick={() => hasMore && toggleCategory(category)}
-//               whileHover={{ scale: hasMore ? 1.02 : 1 }}
-//             >
-//               <h2 className="text-xl font-bold bg-linear-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent capitalize">
-//                 {category === "custom" ? "My Creations" : category}
-//               </h2>
-
-//               {hasMore && (
-//                 <span className="text-sm text-slate-400">
-//                   {isExpanded ? "Show Less ▲" : "Show More ▼"}
-//                 </span>
-//               )}
-//             </motion.div>
-
-//             {/* Smooth Expandable Grid Container */}
-//             <motion.div
-//               layout
-//               animate={{
-//                 height: isExpanded ? "auto" : hasMore ? "180px" : "auto",
-//                 opacity: 1,
-//               }}
-//               transition={{
-//                 type: "spring",
-//                 stiffness: 80,
-//                 damping: 20,
-//               }}
-//               className="overflow-hidden relative px-1"
-//             >
-//               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 p-4">
-//                 {items.map((item, i) => (
-//                   <motion.div
-//                     key={i}
-//                     className="molecule-card transition-transform"
-//                     whileHover={{ scale: 1.05 }}
-//                   >
-//                     <img
-//                       src={item.thumb}
-//                       alt={item.name}
-//                       className="molecule-thumb"
-//                     />
-//                     <div className="molecule-title">{item.name}</div>
-//                   </motion.div>
-//                 ))}
-//               </div>
-
-//               {/* Fade gradient overlay for collapsed state */}
-//               {hasMore && !isExpanded && (
-//                 <div className="absolute bottom-0 left-0 w-full h-20 bg-linear-to-t from-[#0f172a] to-transparent pointer-events-none" />
-//               )}
-//             </motion.div>
-//           </div>
-//         );
-//       })}
-//     </div>
-//   );
-// }
-
-
-import React, { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+// src/HomeGrid.jsx
+import React, { useState, useEffect, useRef } from "react";
+import { motion } from "framer-motion";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import MoleculeCard from "./MoleculeCard";
 
 export default function HomeGrid({ onSelectModel, userId }) {
   const [data, setData] = useState({});
-  const [expanded, setExpanded] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [uploading, setUploading] = useState(false);
 
-  // Fetch templates (molecule, reaction, custom)
+  // which category is expanded (grid mode)
+  const [expanded, setExpanded] = useState(null);
+
+  // refs for each row container
+  const rowRefs = useRef([]);
+  const CARD_WIDTH = 280 + 40; // card width + gap approximation
+
+  /* ---------------- FETCH DATA ---------------- */
   useEffect(() => {
+    let cancelled = false;
     const fetchData = async () => {
       try {
         const res = await fetch("http://127.0.0.1:8000/api/templates/");
         const json = await res.json();
+        if (cancelled) return;
         setData(json);
+        // create a ref for each incoming category (will be stable for render)
+        rowRefs.current = Object.keys(json).map(() => React.createRef());
       } catch (err) {
         console.error("Error fetching templates:", err);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
     fetchData();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const toggleCategory = (category) => {
-    setExpanded(expanded === category ? null : category);
-  };
+  /* ------------------ INITIALIZE CAROUSEL POSITIONS ------------------
+     Use ResizeObserver + requestAnimationFrame + fallbacks to ensure
+     we only set scrollLeft once the scroll container has a usable scrollWidth.
+  --------------------------------------------------------------------- */
+  useEffect(() => {
+    const observers = [];
+    const timers = [];
 
-  // Upload new model
-  const handleUpload = async (e) => {
-    e.preventDefault();
-    setUploading(true);
+    Object.entries(data).forEach(([categoryName, items], index) => {
+      // we only want carousel behaviour for >= 3 items (your rule)
+      if (!items || items.length < 3) return;
+      if (expanded === categoryName) return; // expanded = grid mode, skip
 
-    const form = e.target;
-    const formData = new FormData(form);
+      const ref = rowRefs.current[index];
+      if (!ref || !ref.current) return;
+      const el = ref.current;
 
-    const res = await fetch(`http://127.0.0.1:8000/api/user/${userId}/models/upload/`, {
-      method: "POST",
-      body: formData,
+      // Handler that sets the initial centered scroll position (middle copy)
+      const initPosition = () => {
+        try {
+          // total width of one logical set
+          const totalOneSet = items.length * CARD_WIDTH;
+          // set scrollLeft to the middle copy start
+          // but ensure scrollWidth > clientWidth (otherwise it's meaningless)
+          if (el.scrollWidth > el.clientWidth) {
+            // Use .scrollLeft assignment (no smooth) to avoid jank
+            el.scrollLeft = totalOneSet;
+            return true;
+          }
+        } catch (err) {
+          // ignore
+        }
+        return false;
+      };
+
+      // 1) Try immediate (sometimes already ready)
+      if (initPosition()) return;
+
+      // 2) Use ResizeObserver to wait until layout stabilizes
+      if (window.ResizeObserver) {
+        const ro = new ResizeObserver(() => {
+          if (initPosition()) {
+            ro.disconnect();
+          }
+        });
+        ro.observe(el);
+        observers.push(ro);
+      }
+
+      // 3) Also do a rAF + small timeout fallback to catch cases where ResizeObserver doesn't fire
+      const rafId = requestAnimationFrame(() => {
+        const t = setTimeout(() => {
+          initPosition();
+        }, 60); // small delay to allow layout
+        timers.push(t);
+      });
+      timers.push(rafId);
     });
 
-    const json = await res.json();
-    setUploading(false);
+    // Cleanup
+    return () => {
+      observers.forEach((ro) => {
+        try {
+          ro.disconnect();
+        } catch (e) { }
+      });
+      timers.forEach((t) => {
+        try {
+          clearTimeout(t);
+        } catch (e) { }
+      });
+    };
+  }, [data, expanded]);
 
-    if (json.error) {
-      alert(json.error);
-      return;
+  /* ---------------- SCROLL / INFINITE LOGIC ---------------- */
+  const scrollAmount = 320;
+
+  const handleInfiniteScroll = (ref, itemsLength) => {
+    const el = ref.current;
+    if (!el || !itemsLength) return;
+
+    // total width of one logical set (approx)
+    const total = itemsLength * CARD_WIDTH;
+    const viewport = el.clientWidth;
+    const maxScroll = el.scrollWidth - viewport;
+
+    // when we reach near either edge, jump back into the middle copy region
+    // little epsilon to avoid wobble
+    if (el.scrollLeft <= 5) {
+      // jump to middle (no smooth)
+      el.scrollLeft = total;
+    } else if (el.scrollLeft >= maxScroll - 5) {
+      el.scrollLeft = total - viewport;
     }
-
-    // Append new custom model
-    setData((prev) => ({
-      ...prev,
-      custom: prev.custom ? [json, ...prev.custom] : [json],
-    }));
-
-    form.reset();
   };
 
-  // Delete custom model
-  const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this model?")) return;
-
-    const res = await fetch(`http://127.0.0.1:8000/api/user/${userId}/models/delete/${id}/`, {
-      method: "DELETE",
-    });
-
-    const json = await res.json();
-    if (json.success) {
-      setData((prev) => ({
-        ...prev,
-        custom: prev.custom.filter((item) => item.id !== id),
-      }));
-    } else {
-      alert(json.error || "Failed to delete model");
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-[300px] text-slate-400 text-lg">
-        Loading templates...
-      </div>
-    );
-  }
-
+  /* ---------------- RENDER ---------------- */
   return (
-    <div className="home-grid-section w-full flex flex-col gap-12 max-w-[1200px] mx-auto">
-      {Object.entries(data).map(([category, items]) => {
-        const isExpanded = expanded === category;
-        const hasMore = items.length > 4;
+    <section
+      className="w-screen min-h-screen px-10 md:px-20 pt-36 pb-20 backdrop-blur-2xl bg-[rgba(0,0,0,0.25)] border-t border-[rgba(255,255,255,0.12)]"
+    >
+      <motion.h2
+        initial={{ opacity: 0, y: 20 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6 }}
+        viewport={{ once: true }}
+        className="text-6xl md:text-7xl font-bold text-white mb-20 text-center"
+      >
+        Explore Molecules
+      </motion.h2>
 
-        return (
-          <div key={category} className="w-full relative">
-            {/* Category Header */}
-            <motion.div
-              className="flex justify-between items-center cursor-pointer mb-4 select-none"
-              onClick={() => hasMore && toggleCategory(category)}
-              whileHover={{ scale: hasMore ? 1.02 : 1 }}
-              transition={{ duration: 0.2 }}
-            >
-              <h2 className="text-xl font-bold bg-linear-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent capitalize">
-                {category === "custom" ? "My Creations" : category}
-              </h2>
+      {loading ? (
+        <div className="text-center text-gray-300 text-lg">Loading...</div>
+      ) : (
+        <div className="flex flex-col gap-28">
+          {Object.entries(data).map(([category, items], index) => {
+            const ref = rowRefs.current[index];
+            const isCarousel = Array.isArray(items) && items.length >= 3;
+            const isExpanded = expanded === category;
 
-              {hasMore && (
-                <span className="text-sm text-slate-400">
-                  {isExpanded ? "Show Less ▲" : "Show More ▼"}
-                </span>
-              )}
-            </motion.div>
+            // duplicate only in carousel mode (and only for visual seamless loop)
+            const loopItems = isCarousel && !isExpanded ? [...items, ...items, ...items] : items;
 
-            {/* Model Grid */}
-            <motion.div
-              layout
-              animate={{
-                height: isExpanded ? "auto" : hasMore ? "180px" : "auto",
-                opacity: 1,
-              }}
-              transition={{ type: "spring", stiffness: 80, damping: 20 }}
-              className="overflow-hidden relative"
-            >
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 p-4">
-                {items.map((item, i) => (
-                  <motion.div
-                    key={i}
-                    className="molecule-card cursor-pointer relative transition-transform duration-300 ease-out"
-                    whileHover={{ scale: 1.05 }}
-                    onClick={() => onSelectModel(item)}
-                  >
-                    <img
-                      src={`http://127.0.0.1:8000${item.thumbnail}`}
-                      alt={item.name}
-                      className="molecule-thumb"
-                      loading="lazy"
-                    />
-                    <div className="molecule-title">{item.name}</div>
+            // show nav buttons when there are more than 4 cards (same logic you had)
+            const showButtons = isCarousel && items.length > 4;
 
-                    {/* Delete button for custom models */}
-                    {category === "custom" && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDelete(item.id);
-                        }}
-                        className="absolute top-2 right-2 text-sm text-red-400 hover:text-red-300"
+            return (
+              <div key={category} className="relative">
+                {/* header */}
+                <div className="flex items-center justify-between mb-8">
+                  <h3 className="text-3xl font-bold text-white">
+                    {category === "custom"
+                      ? "My Creations"
+                      : category.charAt(0).toUpperCase() + category.slice(1) + "s"}
+                  </h3>
+
+                  {/* show more/less only for carousel mode */}
+                  {isCarousel && (
+                    <button
+                      onClick={() => setExpanded(isExpanded ? null : category)}
+                      className="text-sm text-gray-300 hover:text-white transition"
+                    >
+                      {isExpanded ? "Show Less ▲" : "Show More ▼"}
+                    </button>
+                  )}
+                </div>
+
+                {/* content */}
+                <div className="relative">
+                  {/* if not carousel OR expanded => grid */}
+                  {(!isCarousel || isExpanded) && (
+                    <motion.div
+                      layout
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.35 }}
+                      className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10 px-2"
+                    >
+                      {items.map((item, i) => (
+                        <div key={i}>
+                          <MoleculeCard
+                            item={item}
+                            onSelect={onSelectModel}
+                            userId={userId}
+                            onDelete={(id) => {
+                              setData((prev) => ({
+                                ...prev,
+                                custom: prev.custom.filter((m) => m.id !== id)
+                              }));
+                            }}
+                          />
+                        </div>
+                      ))}
+                    </motion.div>
+                  )}
+
+                  {/* carousel */}
+                  {isCarousel && !isExpanded && (
+                    <div className="relative group">
+                      {/* fades */}
+                      <div className="pointer-events-none absolute left-0 top-0 h-full w-32 bg-linear-to-r from-[rgba(0,0,0,0.7)] to-transparent opacity-80 z-10"></div>
+                      <div className="pointer-events-none absolute right-0 top-0 h-full w-32 bg-linear-to-l from-[rgba(0,0,0,0.7)] to-transparent opacity-80 z-10"></div>
+
+                      {/* left button (only when showButtons) */}
+                      {showButtons && (
+                        <button
+                          onClick={() => ref?.current?.scrollBy({ left: -scrollAmount, behavior: "smooth" })}
+                          className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/10 backdrop-blur-xl border border-white/20 hover:bg-white/30 hover:cursor-pointer hover:shadow-[0_0_25px_rgba(200,100,255,0.7)] hover:scale-110 transition-all duration-300 p-3 rounded-full text-white shadow-lg opacity-0 group-hover:opacity-100 hidden md:flex z-30"
+                        >
+                          <ChevronLeft size={26} />
+                        </button>
+                      )}
+
+                      <div
+                        ref={ref}
+                        onScroll={() => handleInfiniteScroll(ref, items.length)}
+                        className="flex gap-10 overflow-x-scroll px-2 pb-2 scroll-smooth scrollbar-hide snap-x snap-mandatory"
                       >
-                        ✖
-                      </button>
-                    )}
-                  </motion.div>
-                ))}
-              </div>
+                        {loopItems.map((item, i) => (
+                          <div key={i} className="snap-center shrink-0 w-[280px]">
+                            <MoleculeCard
+                              item={item}
+                              onSelect={onSelectModel}
+                              userId={userId}
+                              onDelete={(id) => {
+                                setData((prev) => ({
+                                  ...prev,
+                                  custom: prev.custom.filter((m) => m.id !== id)
+                                }));
+                              }}
+                            />
+                          </div>
+                        ))}
+                      </div>
 
-              {hasMore && !isExpanded && (
-                <div className="absolute bottom-0 left-0 w-full h-24 bg-linear-to-t from-[#0f172a] to-transparent pointer-events-none" />
-              )}
-            </motion.div>
-          </div>
-        );
-      })}
-    </div>
+                      {showButtons && (
+                        <button
+                          onClick={() => ref?.current?.scrollBy({ left: scrollAmount, behavior: "smooth" })}
+                          className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/10 backdrop-blur-xl border border-white/20 hover:bg-white/30 hover:cursor-pointer hover:shadow-[0_0_25px_rgba(200,100,255,0.7)] hover:scale-110 transition-all duration-300 p-3 rounded-full text-white shadow-lg opacity-0 group-hover:opacity-100 hidden md:flex z-30"
+                        >
+                          <ChevronRight size={26} />
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </section>
   );
 }
