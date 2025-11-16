@@ -5,7 +5,7 @@ export default function MoleculeCard({ item, onSelect }) {
     <div
       onClick={() => onSelect(item)}
       className="
-        group relative cursor-pointer
+        group/card relative cursor-pointer
         rounded-2xl
         bg-white/3
         border border-white/8
@@ -29,12 +29,12 @@ export default function MoleculeCard({ item, onSelect }) {
           absolute inset-0 w-full h-full
           object-cover
           transition-transform duration-500
-          group-hover:scale-110
+          group-hover/card:scale-110
         "
       />
 
-      {/* Dark overlay for readability */}
-      <div className="absolute inset-0 bg-black/20 group-hover:bg-black/30 transition-all duration-300"></div>
+      {/* Dark overlay */}
+      <div className="absolute inset-0 bg-black/20 group-hover/card:bg-black/30 transition-all duration-300"></div>
 
       {/* Floating minimal name label */}
       <div
@@ -45,7 +45,7 @@ export default function MoleculeCard({ item, onSelect }) {
           bg-black/40 backdrop-blur-md
           border border-white/10
           opacity-0 translate-y-2
-          group-hover:opacity-100 group-hover:translate-y-0
+          group-hover/card:opacity-100 group-hover/card:translate-y-0
           transition-all duration-300
         "
       >
