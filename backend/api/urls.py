@@ -5,8 +5,6 @@ from django.conf import settings
 from django.conf.urls.static import static
 
 urlpatterns = [
-    path("notes/", views.NoteListCreate.as_view(), name="note-list"),
-    path("notes/delete/<int:pk>/", views.NoteDelete.as_view(), name="delete-note"),
     path("generate-model/", GenerateModelView.as_view(), name="generate-model"),
     path('templates/', views.get_templates, name='get_templates'),
     path("user/<int:user_id>/models/", views.get_user_models),
