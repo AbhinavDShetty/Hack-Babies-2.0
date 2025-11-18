@@ -3,13 +3,10 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.conf import settings
 from django.contrib.auth.models import User
-from rest_framework import generics
-from .serializers import UserSerializer, NoteSerializer
-from rest_framework.permissions import IsAuthenticated, AllowAny
-from .models import Note, Job, ModelTemplate, ChatSession, ChatMessage
+from .models import Job, ModelTemplate, ChatSession, ChatMessage
 from .generator import parse_prompt_to_plan, generate_from_plan
 from .vector_search import classify_prompt_mode, retrieve_contextual_answer, check_existing_model_with_llm
-import shutil, os, traceback
+import os, traceback
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 
@@ -277,30 +274,6 @@ def get_user_models(request, user_id):
     return JsonResponse([m.to_dict() for m in models], safe=False)
 
 
-class NoteListCreate(generics.ListCreateAPIView):
-    serializer_class = NoteSerializer
-    permission_classes = [IsAuthenticated]
-
-    def get_queryset(self):
-        user = self.request.user
-        return Note.objects.filter(author=user)
-
-    def perform_create(self, serializer):
-        if serializer.is_valid():
-            serializer.save(author=self.request.user)
-        else:
-            print(serializer.errors)
-
-
-class NoteDelete(generics.DestroyAPIView):
-    serializer_class = NoteSerializer
-    permission_classes = [IsAuthenticated]
-
-    def get_queryset(self):
-        user = self.request.user
-        return Note.objects.filter(author=user)
-
-
 
 class GenerateModelView(APIView):
     def post(self, request):
@@ -542,53 +515,3 @@ class GenerateModelView(APIView):
                 {"error": str(e), "trace": traceback.format_exc()},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
-
-
-          
-
-# class GenerateModelView(APIView):
-#     def post(self, request):
-#         prompt = request.data.get("prompt", "").strip()
-#         if not prompt:
-#             return Response({"error": "Prompt required"}, status=status.HTTP_400_BAD_REQUEST)
-
-#         job = Job.objects.create(prompt=prompt, status="processing")
-#         reasoning = ""
-#         model_url = None
-
-#         try:
-#             # Step 1 — Parse prompt using RAG + LLM
-#             plan = parse_prompt_to_plan(prompt)
-#             reasoning = plan.get("reasoning", "")
-
-#             # Step 2 — Generate the molecule model (GLB)
-#             file_path = generate_from_plan(plan)
-
-#             # Step 3 — Move file to /static/generated_models/
-#             static_dir = os.path.join(settings.BASE_DIR, "backend", "static", "generated_models")
-#             os.makedirs(static_dir, exist_ok=True)
-
-#             final_name = f"model_{job.id}.glb"
-#             final_path = os.path.join(static_dir, final_name)
-#             shutil.copy(file_path, final_path)
-
-#             # Step 4 — Build static-accessible URL
-#             model_url = f"/static/generated_models/{final_name}"
-
-#             # Step 5 — Update job record
-#             job.status = "completed"
-#             job.result = model_url
-
-#         except Exception as e:
-#             job.status = "failed"
-#             reasoning = str(e)
-#             model_url = None
-
-#         job.save()
-
-#         return Response({
-#             "id": job.id,
-#             "status": job.status,
-#             "model_url": model_url,   # ✅ what your frontend expects
-#             "reasoning": reasoning
-#         }, status=status.HTTP_200_OK)

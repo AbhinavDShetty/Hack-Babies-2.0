@@ -23,20 +23,6 @@ import heroBg from "./assets/hero_bg.jpg";
 
 import "./App.css";
 
-/**
- * App — refactored
- *
- * Responsibilities:
- * - top-level routing between "home", "chat", and "model"
- * - manage chat sessions and model URLs
- * - handle layout split for model viewer + chat
- * - persist lightweight state to localStorage
- *
- * Notes:
- * - the Landing3D component self-manages its diagonal wipe and scroll transforms.
- * - HomeGrid is placed below the hero using paddingTop on the wrapper.
- */
-
 /* ----------------------
    Constants & helpers
    ---------------------- */
