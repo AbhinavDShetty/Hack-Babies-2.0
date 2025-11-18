@@ -127,14 +127,21 @@ export default function Sidebar({
     savePinnedToStorage(pinnedIds);
 
     try {
-      await fetch(`http://127.0.0.1:8000/api/chat/${idStr}/delete/`, {
-        method: "DELETE",
-      });
+      const res = await fetch(
+        `http://127.0.0.1:8000/api/chat/${idStr}/delete/`,
+        { method: "DELETE" }
+      );
+      if (!res.ok) {
+        console.error("Failed to delete:", await res.text());
+        fetchSessions();
+      }
     } catch (err) {
       console.error("❌ Error deleting chat:", err);
       fetchSessions();
     }
   };
+
+  const handleDelete = (id) => scheduleConfirmation(id);
 
   const togglePin = async (id) => {
     setSessions((prev) => {

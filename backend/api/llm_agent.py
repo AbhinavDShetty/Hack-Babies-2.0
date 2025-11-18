@@ -26,7 +26,7 @@ def call_ollama(prompt: str, context: str = "", stream: bool = False, timeout: i
         # structured format supported by Ollama; optional:
         "format": "json"
     }
-    resp = requests.post(OLLAMA_GENERATE, json=payload, timeout=timeout)
+    resp = requests.post(OLLAMA_GENERATE, json=payload, timeout=timeout, temp=0.7, top_p=0.9, top_k=40)
     resp.raise_for_status()
     data = resp.json()
     # Ollama returns a "response" key for non-streaming usage (or structured)

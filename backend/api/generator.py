@@ -75,6 +75,7 @@ def parse_prompt_to_plan(prompt: str, chat_history: str = "") -> dict:
 
 
 def rdkit_to_glb(smiles, output_dir=None):
+    print(smiles)
     if output_dir is None:
         output_dir = os.path.join(settings.MEDIA_ROOT, "models")
     
