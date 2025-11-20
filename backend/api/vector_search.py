@@ -171,7 +171,7 @@ Example:
 """
 
     try:
-        response_text = query_llm(llm_prompt, timeout=180, retries=1, model_name="gpt-oss:20b")
+        response_text = query_llm(llm_prompt, timeout=180, retries=1, model_name="gpt-oss:120b-cloud")
     except Exception as e:
         print("⚠️ LLM query failed:", e)
         response_text = ""
@@ -258,7 +258,7 @@ Example:
             llm_prompt,
             timeout=120,
             retries=1,
-            model_name="gpt-oss:20b"
+            model_name="gpt-oss:120b-cloud"
         ).strip()
 
         # Find first valid JSON object in response
@@ -450,7 +450,7 @@ Respond ONLY with valid JSON and nothing else.
 """
 
     try:
-        result_text = query_llm(llm_prompt, timeout=120, retries=1, model_name="gpt-oss:20b")
+        result_text = query_llm(llm_prompt, timeout=120, retries=1, model_name="gpt-oss:120b-cloud")
 
         match = re.search(r"\{.*\}", result_text, re.DOTALL)
         if match:
