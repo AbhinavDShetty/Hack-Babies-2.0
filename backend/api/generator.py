@@ -21,10 +21,30 @@ except Exception:
 
 # ----------------------------- Utility -----------------------------
 
+import re
+import json
+
 def extract_smiles_from_text(text: str) -> str:
-    """Extracts a plausible SMILES string from text."""
+    """
+    Extracts a SMILES string from an LLM JSON response like:
+    { "smiles": "Cc1ccccc1" }
+    Falls back to regex extraction if the JSON is malformed.
+    """
+
+    # Try parsing JSON response
+    try:
+        smiles = text.get("smiles", "").strip()
+
+        # Validate SMILES using your original pattern
+        if re.fullmatch(r"[A-Za-z0-9@+\-\[\]\(\)=#$]{2,}", smiles):
+            return smiles
+    except Exception:
+        pass  # Fall back to regex if JSON parsing fails
+
+    # Fallback: extract any valid SMILES-like substring from raw text
     match = re.search(r"([A-Za-z0-9@+\-\[\]\(\)=#$]{2,})", text)
     return match.group(1) if match else ""
+
 
 
 # ----------------------------- Step 1: Interpret Prompt -----------------------------
@@ -46,8 +66,8 @@ def parse_prompt_to_plan(prompt: str, chat_history: str = "") -> dict:
     if not smiles:
         # ask LLM
         try:
-            llm_prompt = f"You are a chemistry assistant. Given: {prompt}\nReturn a single SMILES string only."
-            resp = query_llm(llm_prompt, timeout=180, retries=1)
+            llm_prompt = """You are a chemistry assistant. Given: {prompt}\nReturn a single SMILES in json as {{"smiles": "Cc1ccccc1"}} only."""
+            resp = query_llm(llm_prompt, timeout=180, retries=1, model_name="gpt-oss:120b-cloud")
             smiles = extract_smiles_from_text(resp or "")
             reasoning += "\n(LLM inferred SMILES)"
             title += resp.title or ""

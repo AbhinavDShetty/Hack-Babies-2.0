@@ -185,10 +185,12 @@ You are a chemistry assistant. Based on the following context and user query, ou
 
 Example (correct format):
 {
-  "smiles": "[C-]#[O+]",
-  "title": "Carbon monoxide",
-  "response": "Canonical SMILES for carbon monoxide using the charge-separated form.",
-  "reasoning": "CO is represented canonically as C≡O with separated formal charges."
+    {
+        "smiles": "[C-]#[O+]",
+        "title": "Carbon monoxide",
+        "response": "Canonical SMILES for carbon monoxide using the charge-separated form.",
+        "reasoning": "CO is represented canonically as C≡O with separated formal charges."
+    }
 }
 
 Previous Conversation:
@@ -214,16 +216,11 @@ User query:
     # Try to parse LLM JSON
     if response_text:
         try:
-            match = re.search(r"\{.*\}", response_text, re.DOTALL)
-            if match:
-                data = json.loads(match.group(0))
-                smiles = data.get("smiles", "")
-                reasoning = data.get("reasoning", "")
-                title = data.get("title", "")
-            else:
-                reasoning = response_text.strip()
+            smiles = response_text.get("smiles", "")
+            reasoning = response_text.get("reasoning", "")
+            title = response_text.get("title", "")
         except Exception:
-            reasoning = response_text.strip()
+            reasoning = response_text
 
     # Fallback to PubChem if LLM failed
     if not smiles:
@@ -290,23 +287,15 @@ Example:
             timeout=120,
             retries=1,
             model_name="gpt-oss:120b-cloud"
-        ).strip()
+        )
+        
+        print(f"LLM chat response (in vector_search.py): {response_text}")
 
-        # Find first valid JSON object in response
-        match = re.search(r"\{.*\}", response_text, re.DOTALL)
-        if match:
-            parsed = json.loads(match.group(0))
-            return {
-                "answer": parsed.get("answer", "").strip(),
-                "title": parsed.get("title", "").strip(),
-            }
-        else:
-            # Fallback if JSON not returned properly
-            return {
-                "answer": response_text,
-                "title": "",
-            }
-
+        return {
+            "answer": response_text.get("answer", "").strip(),
+            "title": response_text.get("title", "").strip(),
+        }
+    
     except Exception as e:
         print("⚠️ LLM chat query failed:", e)
         return {
@@ -338,6 +327,7 @@ Examples:
 - "What is the molecular weight of water?" → chat
 - "Make a molecule for glucose" → model
 - "Tell me about the properties of ethanol" → chat
+- "What is the capital of France?" → invalid
 
 Previous Conversation:
 {chat_history}
@@ -347,7 +337,7 @@ User input:
 """
 
     try:
-        response = query_llm(llm_prompt, timeout=60, retries=1, model_name="llama3:8b").strip().lower()
+        response = query_llm(llm_prompt, timeout=60, retries=1, model_name="llama3:8b")
         if "model" in response:
             return "model"
         if "chat" in response:
@@ -434,17 +424,16 @@ Respond ONLY with valid JSON and nothing else.
     try:
         result_text = query_llm(llm_prompt, timeout=120, retries=1, model_name="gpt-oss:120b-cloud")
 
-        match = re.search(r"\{.*\}", result_text, re.DOTALL)
-        if match:
-            parsed = json.loads(match.group(0))
-            return {
-                "exists": bool(parsed.get("exists", False)),
-                "name": parsed.get("name"),
-                "response": parsed.get("response", ""),
-                "model_file": parsed.get("model_file"),
-            }
-        else:
+        parsed = result_text
+        
+        if ("exists" not in parsed) or ("false" in parsed):
             return {"exists": False, "name": None, "model_file": None, "response": ""}
+        return {
+            "exists": bool(parsed.get("exists", False)),
+            "name": parsed.get("name"),
+            "response": parsed.get("response", ""),
+            "model_file": parsed.get("model_file"),
+        }
     except Exception as e:
         print("⚠️ check_existing_model_with_llm failed:", e)
         return {"exists": False, "name": None, "model_file": None, "response": ""}
