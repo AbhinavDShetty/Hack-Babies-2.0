@@ -149,8 +149,47 @@ def retrieve_with_reasoning(prompt: str, chat_history: str = "") -> dict:
     """
     context = retrieve_context(prompt)
     llm_prompt = f"""
-You are a chemistry assistant. Based on the following context and user query,
-output a JSON object with keys: 'smiles' , 'title' , 'response' and 'reasoning'.
+You are a chemistry assistant. Based on the following context and user query, output a single JSON object with exactly these keys: "smiles", "title", "response", and "reasoning".
+
+1. **SMILES ("smiles")**
+   - Produce a **valid, canonical SMILES string** that RDKit can parse safely.
+   - Always include explicit charges and brackets for ions (e.g., `[Na+]`, `[Cl-]`, `[O-]`, `[NH4+]`).
+   - For diatomic molecules or charged heteronuclear bonds, use correct charge-separated canonical forms  
+     (e.g., carbon monoxide = `[C-]#[O+]`).
+   - Use **canonical SMILES only** — no aliases, no shortcuts, no non-canonical equivalents.
+   - For salts or mixtures, output each component as a separate canonical SMILES joined by `"."`.
+   - Never output ambiguous, valence-invalid, or non-canonical SMILES.
+
+2. **Title ("title")**
+   - A short (1–6 words) human-friendly name for the main molecule.
+
+3. **Response ("response")**
+   - A brief (1–3 sentences) explanation of what canonical SMILES was returned and what molecule it represents.
+
+4. **Reasoning ("reasoning")**
+   - A concise explanation of how you selected the canonical SMILES:
+     - How the user’s text implied the molecule
+     - Why this exact canonical SMILES form is correct
+     - Any charge or bonding clarification required
+
+5. **Error Handling**
+   - If the molecule cannot be unambiguously identified:
+     - Set `"smiles": ""`
+     - In `"response"`, explain why the query is ambiguous or underspecified
+     - In `"reasoning"`, list likely interpretations and what clarification is needed
+   - Never generate a SMILES if you are not certain it is correct.
+
+6. **Output Format Requirements**
+   - Return **only** a JSON object with these four keys.
+   - No markdown, no introductory text, no additional commentary.
+
+Example (correct format):
+{
+  "smiles": "[C-]#[O+]",
+  "title": "Carbon monoxide",
+  "response": "Canonical SMILES for carbon monoxide using the charge-separated form.",
+  "reasoning": "CO is represented canonically as C≡O with separated formal charges."
+}
 
 Previous Conversation:
 {chat_history}
@@ -160,14 +199,6 @@ Context:
 
 User query:
 {prompt}
-
-Example:
-{{
-    "smiles": "CCO",
-    "title": "Ethanol Molecule",
-    "reasoning": "User asked for rubbing alcohol, which is ethanol."
-    "response": "Ethanol is a common molecule used in rubbing alcohol. Here is the 3D model of ethanol."
-}}
 """
 
     try:
@@ -299,7 +330,6 @@ Decide if the user's input is for chatting (asking a question)
 or generating a molecule/reaction model.
 
 Respond with ONLY one word: "chat" or "model".
-
 If the prompt is not related to chemistry or is unclear, respond with "invalid".
 
 Examples:
@@ -329,54 +359,6 @@ User input:
         return "chat"
 
 
-# ===========================================
-# Response Validation Function
-
-# def validate_llm_response(prompt: str, response: str, context: str = "", chat_history: str = "") -> str:
-#     """
-#     Validates an LLM's response based on chemistry accuracy, context relevance,
-#     and logical consistency using a lightweight critic model (llama3:8b).
-
-#     Returns:
-#         "valid" or "invalid"
-#     """
-
-#     validation_prompt = f"""
-# You are an expert chemistry validator AI.
-# Your job is to judge whether the assistant's response is factually correct,
-# scientifically reasonable, and relevant to the given user query.
-
-# Use the context and conversation provided, but base your judgment on logic and accuracy.
-
-# Previous Conversation:
-# {chat_history}
-
-# Relevant Context:
-# {context}
-
-# User Query:
-# {prompt}
-
-# Assistant Response:
-# {response}
-
-# Rules:
-# - If the response is factually correct, relevant, and clearly answers the question → respond with "valid".
-# - If the response includes incorrect, misleading, off-topic, or nonsensical information → respond with "invalid".
-# - Do not include explanations or any text other than one word.
-
-# Answer strictly with one of these two words:
-# valid
-# invalid
-# """
-
-#     try:
-#         judgment = query_llm(validation_prompt, timeout=60, retries=1, model_name="llama3:8b").strip().lower()
-#         return "valid" if "valid" in judgment else "invalid"
-#     except Exception as e:
-#         print("⚠️ Response validation failed:", e)
-#         return "invalid"
-
 
 #==========================================
 # Hybrid Model Existence Check
@@ -384,7 +366,7 @@ def check_existing_model_with_llm(prompt: str, all_models: list) -> dict:
     """
     Hybrid method:
     1. Use MiniLM to find top-k semantically similar models.
-    2. Ask GPT-OSS-20B to verify if one matches the requested prompt.
+    2. Ask GPT-OSS-120B-CLOUD to verify if one matches the requested prompt.
     Returns:
         {
           "exists": bool,

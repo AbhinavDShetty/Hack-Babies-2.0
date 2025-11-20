@@ -2,7 +2,7 @@
 import requests
 
 OLLAMA_GENERATE = "http://localhost:11434/api/generate"
-MODEL_NAME = "gpt-oss:20b"
+MODEL_NAME = "gpt-oss:120b-cloud"
 
 SYSTEM_INSTR = """
 You are an expert 3D model planner for a web app. Given a user prompt and supporting context,
